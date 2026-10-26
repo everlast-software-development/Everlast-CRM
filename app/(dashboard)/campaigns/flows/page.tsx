@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Workflow } from "lucide-react";
-import { apiDeleteFlow, apiGetFlows, apiUpdateFlow } from "@/lib/api";
+import { ArrowLeft, CopyPlus, Plus, Trash2, Workflow } from "lucide-react";
+import { apiDeleteFlow, apiDuplicateFlow, apiGetFlows, apiUpdateFlow } from "@/lib/api";
 import type { FlowSummary } from "@/types";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { NoAccess } from "@/components/NoAccess";
@@ -20,6 +20,22 @@ export default function FlowsPage() {
   const { success, error } = useToast();
   const [flows, setFlows] = useState<FlowSummary[] | null>(null);
   const [deleting, setDeleting] = useState<FlowSummary | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+
+  // A whole flow, copied: a new flow with the same steps, then opened. The
+  // server picks a free "X (copy)" / "X (copy 2)" name (flow names are unique).
+  const duplicate = async (f: FlowSummary) => {
+    setDuplicatingId(f.id);
+    try {
+      const res = await apiDuplicateFlow(f.id);
+      success("Copy created — you can edit it");
+      router.push(`/campaigns/flows/${res.data.id}`);
+    } catch (err) {
+      error(err instanceof Error ? err.message : "Couldn't duplicate the flow");
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!ready || !canRead) return;
@@ -30,11 +46,17 @@ export default function FlowsPage() {
     return () => { cancelled = true; };
   }, [ready, canRead, error]);
 
+  // The switch moves at once; the server catches up and, if it refuses, the
+  // switch moves back.
+  const setActive = (id: number, isActive: boolean) =>
+    setFlows((list) => list?.map((x) => (x.id === id ? { ...x, isActive } : x)) ?? list);
   const toggle = async (f: FlowSummary) => {
+    const next = !f.isActive;
+    setActive(f.id, next);
     try {
-      await apiUpdateFlow(f.id, { isActive: !f.isActive });
-      setFlows((list) => list?.map((x) => (x.id === f.id ? { ...x, isActive: !f.isActive } : x)) ?? list);
+      await apiUpdateFlow(f.id, { isActive: next });
     } catch (err) {
+      setActive(f.id, !next);
       error(err instanceof Error ? err.message : "Couldn't update the flow");
     }
   };
@@ -126,11 +148,24 @@ export default function FlowsPage() {
                   <td className="px-5 py-3 text-right text-gray-700">{f.runs.HANDED_OFF ?? 0}</td>
                   <td className="px-5 py-3 text-gray-400 whitespace-nowrap">{new Date(f.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</td>
                   <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1">
+                    {canWrite && (
+                      <button
+                        type="button"
+                        onClick={() => void duplicate(f)}
+                        disabled={duplicatingId !== null}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-brand-fg hover:bg-brand-100 disabled:opacity-40"
+                        title="Duplicate this flow"
+                      >
+                        <CopyPlus className={`w-4 h-4 ${duplicatingId === f.id ? "animate-pulse" : ""}`} />
+                      </button>
+                    )}
                     {canWrite && f.runs.total === 0 && (
                       <button type="button" onClick={() => setDeleting(f)} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50" title="Delete">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
+                    </div>
                   </td>
                 </tr>
               ))}

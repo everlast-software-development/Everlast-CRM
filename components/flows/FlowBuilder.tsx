@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -14,15 +14,18 @@ import {
   type EdgeChange,
   type NodeChange,
   type IsValidConnection,
+  type ReactFlowInstance,
+  SelectionMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Plus, Save, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, FlaskConical, GalleryHorizontal, Images } from "lucide-react";
+import { ClipboardPaste, Copy, CopyPlus, GripVertical, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, FlaskConical, GalleryHorizontal, Images } from "lucide-react";
 import type { AssignableUser, FlowGraph, FlowNodeData, FlowNodeType, FlowValidationError, Template } from "@/types";
 import { ADDABLE_STEPS, STEP_META, defaultData, outputsOf, uid } from "@/lib/flows";
 import { StepNode, type StepFlowNode } from "./StepNode";
 import { StepEditor } from "./StepEditor";
 import { FlowSimulator } from "./FlowSimulator";
 import { useTheme } from "@/components/ThemeProvider";
+import { useToast } from "@/components/ui/toast";
 
 const nodeTypes = {
   trigger: StepNode,
@@ -55,6 +58,32 @@ const EDGE_DEFAULTS = {
   style: { stroke: "var(--flow-edge)", strokeWidth: 1.5 },
 };
 
+// A step card's width (StepNode.tsx): dropped and clicked steps are centred
+// on the point they're placed at.
+const NODE_W = 300;
+const NODE_H = 150;
+// What a palette item carries while it's dragged onto the canvas.
+const DRAG_MIME = "application/x-everlast-flow-step";
+
+// Copied steps travel through the system clipboard as JSON, so they paste
+// into another flow or another tab. The in-memory copy covers browsers that
+// won't let a page read the clipboard.
+const CLIP_KIND = "everlast-flow-steps";
+type StepClip = { kind: typeof CLIP_KIND; v: 1; nodes: { id: string; type: FlowNodeType; position: { x: number; y: number }; data: FlowNodeData }[]; edges: { source: string; sourceHandle: string; target: string }[] };
+let memoryClip: StepClip | null = null;
+const parseClip = (text: string | null | undefined): StepClip | null => {
+  try {
+    const c = JSON.parse(String(text || ""));
+    return c && c.kind === CLIP_KIND && Array.isArray(c.nodes) && Array.isArray(c.edges) ? (c as StepClip) : null;
+  } catch {
+    return null;
+  }
+};
+const isTyping = (t: EventTarget | null) => {
+  const el = t as HTMLElement | null;
+  return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
+};
+
 function toRfNodes(graph: FlowGraph): StepFlowNode[] {
   return graph.nodes.map((n) => ({
     id: n.id,
@@ -69,6 +98,12 @@ function toRfEdges(graph: FlowGraph): Edge[] {
   return graph.edges.map((e) => ({ ...EDGE_DEFAULTS, id: e.id, source: e.source, sourceHandle: e.sourceHandle, target: e.target }));
 }
 
+/** What the page can ask of the builder: save from the header / Ctrl+S, read the current graph. */
+export interface FlowBuilderControl {
+  save: () => Promise<boolean>;
+  snapshot: () => FlowGraph;
+}
+
 export interface FlowBuilderProps {
   initialGraph: FlowGraph;
   templates: Template[];
@@ -79,16 +114,26 @@ export interface FlowBuilderProps {
   /** Resolves true when the flow was saved (the "unsaved changes" marker clears). */
   onSave: (graph: FlowGraph) => Promise<boolean>;
   onDirtyChange: (dirty: boolean) => void;
+  /** Filled in by the builder so the page can save and read the graph. */
+  controlRef?: React.RefObject<FlowBuilderControl | null>;
+  /** Every edit, with the current graph — the page keeps a local backup of unsaved work. */
+  onGraphChange?: (graph: FlowGraph) => void;
 }
 
-export function FlowBuilder({ initialGraph, templates, agents, readOnly, saving, serverErrors, onSave, onDirtyChange }: FlowBuilderProps) {
+// Saving happens from the page header (Save button, Ctrl+S) through controlRef.
+export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverErrors, onSave, onDirtyChange, controlRef, onGraphChange }: FlowBuilderProps) {
   const [nodes, setNodes] = useState<StepFlowNode[]>(() => toRfNodes(initialGraph));
   const [edges, setEdges] = useState<Edge[]>(() => toRfEdges(initialGraph));
   const [selectedId, setSelectedId] = useState<string | null>(initialGraph.nodes[0]?.id ?? null);
   const [dirty, setDirty] = useState(false);
   const [testing, setTesting] = useState(false);
   const { resolvedTheme } = useTheme();
+  const toast = useToast();
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  // The canvas, to turn a screen point (drop, middle of the view) into a flow position.
+  const [rf, setRf] = useState<ReactFlowInstance<StepFlowNode, Edge> | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [dropHover, setDropHover] = useState(false);
 
   const markDirty = useCallback(() => setDirty(true), []);
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
@@ -169,20 +214,32 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, saving,
     markDirty();
   }, [markDirty]);
 
-  // New steps appear to the right of the selected one and, if it has an
-  // unconnected output, get wired to it — so building a branch is click, click.
-  const addStep = useCallback((type: FlowNodeType) => {
+  // Like n8n: drag a step from the palette and drop it where it should go, or
+  // click it to drop it in the middle of what you're looking at.
+  //   - click: also wired to the selected step's first free output, so
+  //     building a branch is select, click, select, click.
+  //   - drop:  placed exactly under the cursor, not wired — you connect it.
+  const addStep = useCallback((type: FlowNodeType, at?: { x: number; y: number }) => {
     const id = uid(type);
-    const from = nodes.find((n) => n.id === selectedId) || nodes[nodes.length - 1];
+    let position: { x: number; y: number };
+    if (at) {
+      position = at;
+    } else {
+      const box = canvasRef.current?.getBoundingClientRect();
+      const centre = rf && box ? rf.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 }) : { x: 0, y: 0 };
+      position = { x: centre.x - NODE_W / 2, y: centre.y - NODE_H / 2 };
+      // Don't stack a new card exactly on top of one already there.
+      while (nodes.some((n) => Math.abs(n.position.x - position.x) < 40 && Math.abs(n.position.y - position.y) < 40)) {
+        position = { x: position.x + 48, y: position.y + 48 };
+      }
+    }
+
+    const from = at ? null : nodes.find((n) => n.id === selectedId) || null;
     let freeHandle: string | null = null;
     if (from) {
       const used = new Set(edges.filter((e) => e.source === from.id).map((e) => e.sourceHandle || "next"));
       freeHandle = outputsOf(from.type, from.data).map(([h]) => h).find((h) => !used.has(h)) ?? null;
     }
-    const siblings = from ? edges.filter((e) => e.source === from.id).length : 0;
-    const position = from
-      ? { x: from.position.x + 320, y: from.position.y + siblings * 170 }
-      : { x: 0, y: 0 };
     setNodes((ns) => [
       ...ns.map((n) => ({ ...n, selected: false })),
       { id, type, position, data: defaultData(type), deletable: true, selected: true },
@@ -192,7 +249,144 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, saving,
     }
     setSelectedId(id);
     markDirty();
-  }, [nodes, edges, selectedId, markDirty]);
+  }, [nodes, edges, selectedId, markDirty, rf]);
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDropHover(true);
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    setDropHover(false);
+    const type = e.dataTransfer.getData(DRAG_MIME) as FlowNodeType;
+    if (!type || !ADDABLE_STEPS.includes(type) || !rf) return;
+    e.preventDefault();
+    const p = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    addStep(type, { x: p.x - NODE_W / 2, y: p.y - 28 });
+  }, [rf, addStep]);
+
+  // ── Copy, paste, duplicate (Ctrl+C / Ctrl+V / Ctrl+D, or the toolbar) ──
+  // The Start step can't be copied: a flow has exactly one.
+  const selectedSteps = nodes.filter((n) => n.selected && n.type !== "trigger");
+  const [canPaste, setCanPaste] = useState(() => memoryClip !== null);
+
+  const clipOf = useCallback((list: StepFlowNode[]): StepClip => {
+    const ids = new Set(list.map((n) => n.id));
+    return {
+      kind: CLIP_KIND,
+      v: 1,
+      nodes: list.map((n) => {
+        const data: FlowNodeData = JSON.parse(JSON.stringify(n.data));
+        delete data.problems;
+        delete data.active;
+        return { id: n.id, type: n.type, position: { ...n.position }, data };
+      }),
+      edges: edges
+        .filter((e) => ids.has(e.source) && ids.has(e.target))
+        .map((e) => ({ source: e.source, sourceHandle: e.sourceHandle || "next", target: e.target })),
+    };
+  }, [edges]);
+
+  // Places a copy: fresh ids, the connections between the copied steps kept,
+  // nothing connected to the rest of the flow. at = where its top-left goes.
+  const placeClip = useCallback((clip: StepClip, at: { x: number; y: number }) => {
+    const steps = clip.nodes.filter((n) => n.type !== "trigger" && ADDABLE_STEPS.includes(n.type));
+    if (!steps.length) return 0;
+    const minX = Math.min(...steps.map((n) => n.position.x));
+    const minY = Math.min(...steps.map((n) => n.position.y));
+    const idMap = new Map(steps.map((n) => [n.id, uid(n.type)]));
+    const added: StepFlowNode[] = steps.map((n) => ({
+      id: idMap.get(n.id)!,
+      type: n.type,
+      position: { x: at.x + (n.position.x - minX), y: at.y + (n.position.y - minY) },
+      data: JSON.parse(JSON.stringify(n.data)),
+      deletable: true,
+      selected: true,
+    }));
+    const addedEdges = clip.edges
+      .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+      .map((e) => ({ ...EDGE_DEFAULTS, id: uid("e"), source: idMap.get(e.source)!, sourceHandle: e.sourceHandle, target: idMap.get(e.target)! }));
+    setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), ...added]);
+    setEdges((es) => [...es, ...addedEdges]);
+    setSelectedId(added.length === 1 ? added[0].id : null);
+    markDirty();
+    return added.length;
+  }, [markDirty]);
+
+  const copySelected = useCallback(async () => {
+    if (!selectedSteps.length) {
+      toast.error("Select one or more steps to copy");
+      return;
+    }
+    const clip = clipOf(selectedSteps);
+    memoryClip = clip;
+    setCanPaste(true);
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(clip));
+    } catch {
+      // Clipboard blocked: the in-memory copy still pastes in this tab.
+    }
+    toast.success(`Copied ${clip.nodes.length} step${clip.nodes.length > 1 ? "s" : ""} — paste with Ctrl+V, here or in another flow`);
+  }, [selectedSteps, clipOf, toast]);
+
+  const pasteSteps = useCallback(async () => {
+    let clip: StepClip | null = null;
+    try {
+      clip = parseClip(await navigator.clipboard.readText());
+    } catch {
+      /* not allowed to read: fall back to this tab's copy */
+    }
+    clip = clip ?? memoryClip;
+    if (!clip) {
+      toast.error("Nothing to paste — copy some steps first (Ctrl+C)");
+      return;
+    }
+    // Into the middle of the view, nudged if something is already right there.
+    const box = canvasRef.current?.getBoundingClientRect();
+    const centre = rf && box ? rf.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 }) : { x: 0, y: 0 };
+    let at = { x: centre.x - NODE_W / 2, y: centre.y - NODE_H / 2 };
+    while (nodes.some((n) => Math.abs(n.position.x - at.x) < 40 && Math.abs(n.position.y - at.y) < 40)) {
+      at = { x: at.x + 48, y: at.y + 48 };
+    }
+    const n = placeClip(clip, at);
+    if (n) toast.success(`Pasted ${n} step${n > 1 ? "s" : ""}`);
+  }, [rf, nodes, placeClip, toast]);
+
+  const duplicateSelected = useCallback(() => {
+    if (!selectedSteps.length) return;
+    const clip = clipOf(selectedSteps);
+    const minX = Math.min(...clip.nodes.map((n) => n.position.x));
+    const minY = Math.min(...clip.nodes.map((n) => n.position.y));
+    placeClip(clip, { x: minX + 48, y: minY + 48 });
+  }, [selectedSteps, clipOf, placeClip]);
+
+  useEffect(() => {
+    if (readOnly) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || isTyping(e.target)) return;
+      const k = e.key.toLowerCase();
+      if (k === "c" && selectedSteps.length) {
+        // Leave a normal text copy alone (text selected on the page).
+        if (window.getSelection()?.toString()) return;
+        e.preventDefault();
+        void copySelected();
+      } else if (k === "v") {
+        e.preventDefault();
+        void pasteSteps();
+      } else if (k === "a") {
+        // Select every step (not the Start step, which can't be copied).
+        e.preventDefault();
+        setNodes((ns) => ns.map((n) => ({ ...n, selected: n.type !== "trigger" })));
+      } else if (k === "d" && selectedSteps.length) {
+        e.preventDefault();
+        duplicateSelected();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [readOnly, selectedSteps.length, copySelected, pasteSteps, duplicateSelected]);
 
   const snapshot = (): FlowGraph => ({
       nodes: nodes.map((n) => {
@@ -205,8 +399,22 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, saving,
   });
 
   const save = async () => {
-    if (await onSave(snapshot())) setDirty(false);
+    const ok = await onSave(snapshot());
+    if (ok) setDirty(false);
+    return ok;
   };
+
+  // The page's header Save button, Ctrl+S and its leave-with-unsaved-changes
+  // prompt all save through here, and its local backup reads the graph.
+  useEffect(() => {
+    if (!controlRef) return;
+    controlRef.current = { save, snapshot };
+  });
+  useEffect(() => {
+    if (dirty) onGraphChange?.(snapshot());
+    // snapshot() reads nodes/edges; re-run only when they (or dirtiness) change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges, dirty]);
 
   const selected = nodes.find((n) => n.id === selectedId) || null;
 
@@ -214,8 +422,8 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, saving,
     <div className="flex flex-1 min-h-0">
       {/* Palette */}
       {!readOnly && (
-        <aside className="w-52 shrink-0 border-r border-gray-100 bg-white p-3 space-y-1.5 overflow-y-auto">
-          <p className="text-[11px] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1">Add a step</p>
+        <aside className="w-64 shrink-0 border-r border-gray-100 bg-white p-3 space-y-2 overflow-y-auto">
+          <p className="text-[11px] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1">Steps</p>
           {ADDABLE_STEPS.map((t) => {
             const Icon = PALETTE_ICONS[t]!;
             const meta = STEP_META[t];
@@ -223,30 +431,45 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, saving,
               <button
                 key={t}
                 type="button"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(DRAG_MIME, t);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onDragEnd={() => setDropHover(false)}
                 onClick={() => addStep(t)}
-                className="w-full flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-colors"
+                title="Drag onto the canvas, or click to add it in the middle"
+                className="group w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm cursor-grab active:cursor-grabbing transition-[border-color,box-shadow]"
               >
-                <span className="w-7 h-7 rounded-md flex items-center justify-center text-white shrink-0" style={{ background: meta.color }}>
-                  <Icon className="w-3.5 h-3.5" />
+                <span className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: meta.color }}>
+                  <Icon className="w-[18px] h-[18px]" />
                 </span>
-                <span className="min-w-0">
-                  <span className="flex items-center gap-1 text-[13px] font-semibold text-gray-800">
-                    {meta.label} <Plus className="w-3 h-3 text-gray-400" />
-                  </span>
-                  <span className="block text-[11px] text-gray-400 leading-snug">{meta.hint}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-semibold text-gray-800">{meta.label}</span>
+                  <span className="block text-[11.5px] text-gray-400 leading-snug">{meta.hint}</span>
                 </span>
+                <GripVertical className="w-4 h-4 text-gray-300 group-hover:text-gray-400 shrink-0" />
               </button>
             );
           })}
-          <p className="text-[11px] text-gray-400 leading-relaxed px-1 pt-3">
-            Select a step, then add the next one — it connects to the first free output. Drag from an output dot to connect by hand. Select a line and press Delete to remove it.
+          <p className="text-[11.5px] text-gray-400 leading-relaxed px-1 pt-3">
+            Drag a step onto the canvas, or click it to add it in the middle — a clicked step connects to the selected step&apos;s first free output. Drag from an output dot to connect by hand; select a line and press Delete to remove it. Drag on empty space to select several steps (Ctrl+A selects all); scroll or right-drag to move around, Ctrl+scroll to zoom. Ctrl+C / Ctrl+V copies steps (also into another flow), Ctrl+D duplicates them.
           </p>
         </aside>
       )}
 
       {/* Canvas */}
-      <div className="flex-1 min-w-0 relative bg-canvas">
+      <div
+        ref={canvasRef}
+        className={`flex-1 min-w-0 relative bg-canvas transition-shadow ${dropHover ? "ring-2 ring-inset ring-brand/40" : ""}`}
+        onDragOver={readOnly ? undefined : onDragOver}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropHover(false);
+        }}
+        onDrop={readOnly ? undefined : onDrop}
+      >
         <ReactFlow
+          onInit={setRf}
           nodes={displayNodes}
           edges={edges}
           nodeTypes={nodeTypes}
@@ -259,16 +482,63 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, saving,
           nodesDraggable={!readOnly}
           nodesConnectable={!readOnly}
           deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
+          // Like n8n: left-drag on empty canvas draws a selection box (any step
+          // it touches is selected); the wheel/touchpad or a right/middle-button
+          // drag moves around; Ctrl+wheel zooms.
+          // Right-drag pans, so the browser menu would pop up on release.
+          onPaneContextMenu={(e) => e.preventDefault()}
+          selectionOnDrag={!readOnly}
+          selectionMode={SelectionMode.Partial}
+          panOnDrag={readOnly ? true : [1, 2]}
+          panOnScroll
+          zoomOnScroll={false}
+          zoomActivationKeyCode={["Control", "Meta"]}
+          multiSelectionKeyCode={["Control", "Meta", "Shift"]}
           fitView
           fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
           minZoom={0.3}
           proOptions={{ hideAttribution: true }}
           colorMode={resolvedTheme ?? "light"}
+          className="flow-canvas"
         >
           <Background gap={20} color="var(--flow-grid)" />
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable className="!bg-white !border !border-gray-200 !rounded-lg" maskColor="rgba(0,0,0,0.04)" />
         </ReactFlow>
+
+        {!readOnly && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 rounded-xl border border-gray-200 bg-white/95 shadow-sm px-1.5 py-1">
+            <span className="px-1.5 text-[11.5px] text-gray-400 whitespace-nowrap">
+              {selectedSteps.length ? `${selectedSteps.length} selected` : "Drag on empty space to select"}
+            </span>
+            <button
+              type="button"
+              onClick={() => void copySelected()}
+              disabled={!selectedSteps.length}
+              title="Copy (Ctrl+C)"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <Copy className="w-3.5 h-3.5" /> Copy
+            </button>
+            <button
+              type="button"
+              onClick={duplicateSelected}
+              disabled={!selectedSteps.length}
+              title="Duplicate (Ctrl+D)"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <CopyPlus className="w-3.5 h-3.5" /> Duplicate
+            </button>
+            <button
+              type="button"
+              onClick={() => void pasteSteps()}
+              title={canPaste ? "Paste (Ctrl+V)" : "Paste (Ctrl+V) — copy steps here or in another flow first"}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <ClipboardPaste className="w-3.5 h-3.5" /> Paste
+            </button>
+          </div>
+        )}
 
         {generalProblems.length > 0 && (
           <div className="absolute top-3 left-3 right-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 shadow-sm">
@@ -277,7 +547,6 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, saving,
         )}
 
         <div className="absolute bottom-4 right-4 flex items-center gap-3">
-            {dirty && !readOnly && <span className="text-[12px] text-gray-500 bg-white/90 rounded-md px-2 py-1 border border-gray-200">Unsaved changes</span>}
             <button
               type="button"
               onClick={() => { setTesting((t) => !t); setActiveNodeId(null); }}
@@ -285,16 +554,6 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, saving,
             >
               <FlaskConical className="w-4 h-4" /> {testing ? "Close test" : "Test"}
             </button>
-            {!readOnly && (
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              className="inline-flex items-center gap-2 bg-brand hover:bg-[#2f5840] disabled:opacity-60 text-white text-[13px] font-semibold rounded-xl px-4 py-2.5 shadow-md"
-            >
-              <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save flow"}
-            </button>
-            )}
           </div>
       </div>
 

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Download, MessageCircle, RefreshCw } from "lucide-react";
 import { apiGetFlowRuns } from "@/lib/api";
 import { RUN_STATUS_META } from "@/lib/flows";
-import type { FlowRun, FlowRunStatus } from "@/types";
+import type { FlowGraph, FlowRun, FlowRunStatus } from "@/types";
+import { FlowRunJourney } from "./FlowRunJourney";
 import { useToast } from "@/components/ui/toast";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 
@@ -26,7 +27,7 @@ function csvCell(v: unknown): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function FlowResponses({ flowId, flowName }: { flowId: number; flowName: string }) {
+export function FlowResponses({ flowId, flowName, graph }: { flowId: number; flowName: string; graph: FlowGraph }) {
   const { error: toastError } = useToast();
   // The chat link opens the inbox, which MARKETING doesn't have.
   const canOpenChat = useCurrentUser().can("conversation:write");
@@ -39,6 +40,8 @@ export function FlowResponses({ flowId, flowName }: { flowId: number; flowName: 
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const [exporting, setExporting] = useState(false);
+  // The response whose path is open in the side panel.
+  const [openRun, setOpenRun] = useState<FlowRun | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,7 +136,12 @@ export function FlowResponses({ flowId, flowName }: { flowId: number; flowName: 
           </thead>
           <tbody className="divide-y divide-gray-50">
             {runs.map((r) => (
-              <tr key={r.id} className="align-top">
+              <tr
+                key={r.id}
+                onClick={() => setOpenRun(r)}
+                title="See the path this patient took"
+                className="align-top cursor-pointer hover:bg-gray-50/80 transition-colors"
+              >
                 <td className="px-4 py-3">
                   <p className="font-medium text-gray-900">{r.customer.name || "—"}</p>
                   <p className="text-[12px] text-gray-400">{r.customer.phone}</p>
@@ -152,7 +160,7 @@ export function FlowResponses({ flowId, flowName }: { flowId: number; flowName: 
                 <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmt(r.startedAt)}</td>
                 <td className="px-4 py-3">
                   {canOpenChat && (
-                    <Link href={`/chats/${r.conversationId}`} title="Open chat" className="inline-flex w-8 h-8 rounded-lg items-center justify-center text-gray-400 hover:text-brand-fg hover:bg-brand-100">
+                    <Link href={`/chats/${r.conversationId}`} title="Open chat" onClick={(e) => e.stopPropagation()} className="inline-flex w-8 h-8 rounded-lg items-center justify-center text-gray-400 hover:text-brand-fg hover:bg-brand-100">
                       <MessageCircle className="w-4 h-4" />
                     </Link>
                   )}
@@ -167,6 +175,10 @@ export function FlowResponses({ flowId, flowName }: { flowId: number; flowName: 
           </p>
         )}
       </div>
+
+      {openRun && (
+        <FlowRunJourney run={openRun} graph={graph} canOpenChat={canOpenChat} onClose={() => setOpenRun(null)} />
+      )}
 
       {totalPages > 1 && (
         <div className="flex items-center justify-end gap-2 mt-4 text-[13px]">
