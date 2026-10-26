@@ -144,11 +144,31 @@ export default function TemplateForm({
     if (!el) return;
     const start = el.selectionStart ?? 0;
     const end = el.selectionEnd ?? 0;
-    const next = body.slice(0, start) + marker + body.slice(start, end) + marker + body.slice(end);
-    setBody(next);
+    // Nothing selected: drop in a pair and put the cursor between them.
+    if (start === end) {
+      setBody(body.slice(0, start) + marker + marker + body.slice(end));
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(start + marker.length, start + marker.length);
+      });
+      return;
+    }
+    // WhatsApp only formats *text* when both markers sit on the same line, hug
+    // the words (no space or line break just inside) — so each selected line
+    // is wrapped on its own, around its words, leaving spaces and blank lines
+    // outside the markers.
+    const wrapped = body
+      .slice(start, end)
+      .split("\n")
+      .map((line) => {
+        const m = /^(\s*)(.*?)(\s*)$/.exec(line);
+        return m && m[2] ? `${m[1]}${marker}${m[2]}${marker}${m[3]}` : line;
+      })
+      .join("\n");
+    setBody(body.slice(0, start) + wrapped + body.slice(end));
     requestAnimationFrame(() => {
       el.focus();
-      el.setSelectionRange(start + marker.length, end + marker.length);
+      el.setSelectionRange(start, start + wrapped.length);
     });
   }
 
