@@ -57,7 +57,7 @@ function SideTip({ label, show, children }: { label: string; show: boolean; chil
   );
 }
 
-const ROLE_WORDS: Record<string, string> = { ADMIN: "Admin", MARKETING: "Marketing", SUPERVISOR: "Supervisor", AGENT: "Agent" };
+const ROLE_WORDS: Record<string, string> = { ADMIN: "Admin", MARKETING: "Marketing", SUPERVISOR: "Supervisor", AGENT: "Agent", DIRECTOR: "Director" };
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -70,11 +70,12 @@ function initials(name: string): string {
 // Admins don't take breaks or hand over a queue, so they just see their role.
 // Collapsed, it's the initials; clicking them opens the sidebar.
 function SidebarUser({ expanded, onExpand }: { expanded: boolean; onExpand?: () => void }) {
-  const { me } = useCurrentUser();
+  const { me, can } = useCurrentUser();
   if (!me) return null;
   const display = me.name || me.username;
   const role = ROLE_WORDS[me.role] ?? me.role;
-  const showsStatus = me.role !== "ADMIN" && me.role !== "MARKETING";
+  // Status and hand-over are for people who work the inbox, admins aside.
+  const showsStatus = me.role !== "ADMIN" && can("conversation:write");
   const avatar = (
     <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-white font-semibold text-[12px] shrink-0">
       {initials(display)}

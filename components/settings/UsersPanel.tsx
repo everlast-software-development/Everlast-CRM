@@ -131,6 +131,7 @@ const ROLE_BADGE: Record<AgentUser["role"], { label: string; className: string }
   MARKETING: { label: "Marketing", className: "bg-amber-50 text-amber-700 border-amber-200" },
   SUPERVISOR: { label: "Supervisor", className: "bg-sky-50 text-sky-700 border-sky-200" },
   AGENT: { label: "Agent", className: "bg-gray-50 text-gray-500 border-gray-200" },
+  DIRECTOR: { label: "Director", className: "bg-violet-50 text-violet-700 border-violet-200" },
 };
 
 function RoleBadge({ role }: { role: AgentUser["role"] }) {
@@ -339,6 +340,7 @@ function CreateUserDrawer({ open, onClose, onCreated }: CreateDrawerProps) {
             <RoleCard role="MARKETING" selected={role === "MARKETING"} onSelect={() => setRole("MARKETING")} />
             <RoleCard role="SUPERVISOR" selected={role === "SUPERVISOR"} onSelect={() => setRole("SUPERVISOR")} />
             <RoleCard role="AGENT" selected={role === "AGENT"} onSelect={() => setRole("AGENT")} />
+            <RoleCard role="DIRECTOR" selected={role === "DIRECTOR"} onSelect={() => setRole("DIRECTOR")} />
           </div>
         </div>
 
@@ -446,6 +448,7 @@ function EditUserDrawer({ open, user, onClose, onSaved }: EditDrawerProps) {
             <RoleCard role="MARKETING" selected={role === "MARKETING"} onSelect={() => setRole("MARKETING")} />
             <RoleCard role="SUPERVISOR" selected={role === "SUPERVISOR"} onSelect={() => setRole("SUPERVISOR")} />
             <RoleCard role="AGENT" selected={role === "AGENT"} onSelect={() => setRole("AGENT")} />
+            <RoleCard role="DIRECTOR" selected={role === "DIRECTOR"} onSelect={() => setRole("DIRECTOR")} />
           </div>
           {user && INBOX_ROLES.includes(user.role) && !INBOX_ROLES.includes(role) && (
             <p className="mt-3 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
@@ -660,6 +663,7 @@ const ROLE_COPY: Record<UserRole, { label: string; blurb: string }> = {
     blurb: "An agent who also manages the agents: sees every chat, waiting times and follow-ups on the Supervision page. Can reply, reassign and leave notes; can read campaign results.",
   },
   AGENT: { label: "Agent", blurb: "Inbox, contacts and replies" },
+  DIRECTOR: { label: "Director", blurb: "Dashboards, reports, team performance and campaign results — read-only, no inbox" },
 };
 
 function RoleCard({ role, selected, onSelect }: RoleCardProps) {
@@ -959,6 +963,7 @@ export function UsersPanel() {
           <FilterPill label="Marketing" active={roleFilter === "MARKETING"} onClick={() => setRoleFilter("MARKETING")} />
           <FilterPill label="Supervisor" active={roleFilter === "SUPERVISOR"} onClick={() => setRoleFilter("SUPERVISOR")} />
           <FilterPill label="Agent" active={roleFilter === "AGENT"} onClick={() => setRoleFilter("AGENT")} />
+          <FilterPill label="Director" active={roleFilter === "DIRECTOR"} onClick={() => setRoleFilter("DIRECTOR")} />
           <span className="w-px h-5 bg-gray-200 mx-1" aria-hidden />
           <FilterPill
             label={deactivatedCount > 0 ? `Show deactivated (${deactivatedCount})` : "Show deactivated"}
@@ -1023,7 +1028,7 @@ export function UsersPanel() {
                 const initials = getInitials(user);
                 const displayName = user.name || user.username;
                 // The privileged roles carry the brand tint; agents stay neutral.
-                const elevated = user.role === "ADMIN" || user.role === "MARKETING" || user.role === "SUPERVISOR";
+                const elevated = user.role !== "AGENT";
                 const avatarBg = elevated ? "bg-brand-200" : "bg-gray-100";
                 const avatarText = elevated ? "text-brand-fg" : "text-gray-500";
 

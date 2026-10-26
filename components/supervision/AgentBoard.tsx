@@ -118,12 +118,13 @@ export function AgentBoard({
   onHandedOver?: () => void;
 }) {
   const toast = useToast();
-  const { me } = useCurrentUser();
+  const { me, can } = useCurrentUser();
   const [handingOver, setHandingOver] = useState<SupervisionAgent | null>(null);
-  // Same rule as the server: not your own chats (that's End of shift), and a
-  // supervisor can't hand over an admin's.
+  // Same rule as the server: only people who can assign (not a read-only
+  // director), not your own chats (that's End of shift), and a supervisor
+  // can't hand over an admin's.
   const mayHandOver = (a: SupervisionAgent) =>
-    a.id !== me?.id && (a.role !== "ADMIN" || me?.role === "ADMIN");
+    can("conversation:assign") && a.id !== me?.id && (a.role !== "ADMIN" || me?.role === "ADMIN");
   const agents = useMemo(
     () =>
       [...(overview?.agents ?? [])].sort(

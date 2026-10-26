@@ -622,6 +622,8 @@ export function ConversationDetail({
             title="Notes"
             aside={data.notes.length > 0 ? <span className="text-[11px] text-gray-400">{data.notes.length}</span> : undefined}
           >
+            {/* Writing notes needs an inbox role; a director reads them only. */}
+            {canOpenInbox && (
             <div className="rounded-xl border border-gray-200 focus-within:border-brand/50 bg-white">
               <textarea
                 value={note}
@@ -649,6 +651,7 @@ export function ConversationDetail({
                 </button>
               </div>
             </div>
+            )}
             {data.notes.length === 0 ? (
               <p className="text-[12.5px] text-gray-400 mt-3">No notes yet.</p>
             ) : (

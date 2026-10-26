@@ -20,6 +20,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
   MARKETING: "Marketing",
   SUPERVISOR: "Supervisor",
   AGENT: "Agent",
+  DIRECTOR: "Director",
 };
 
 function ReadOnlyField({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {

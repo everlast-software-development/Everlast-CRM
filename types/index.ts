@@ -334,7 +334,7 @@ export interface MediaAssetResponse {
   data: MediaAsset;
 }
 
-export type UserRole = "ADMIN" | "MARKETING" | "AGENT" | "SUPERVISOR";
+export type UserRole = "ADMIN" | "MARKETING" | "AGENT" | "SUPERVISOR" | "DIRECTOR";
 
 export interface AgentUser {
   id: number;

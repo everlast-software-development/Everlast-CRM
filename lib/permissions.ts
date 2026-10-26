@@ -65,6 +65,8 @@ export function canAny(user: PermissionBearer, ...required: Permission[]): boole
  */
 export function homePathFor(user: PermissionBearer): string {
   if (can(user, "conversation:write")) return "/chats";
+  // Leadership without an inbox (DIRECTOR) starts on the dashboard.
+  if (can(user, "stats:team")) return "/dashboard";
   if (can(user, "campaign:read")) return "/campaigns";
   if (can(user, "contact:read")) return "/customers";
   if (can(user, "stats:read")) return "/dashboard";

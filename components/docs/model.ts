@@ -24,13 +24,14 @@ export interface DocPage {
   body: (ctx: DocCtx) => ReactNode;
 }
 
-export const ROLES: UserRole[] = ["ADMIN", "SUPERVISOR", "AGENT", "MARKETING"];
+export const ROLES: UserRole[] = ["ADMIN", "DIRECTOR", "SUPERVISOR", "AGENT", "MARKETING"];
 
 /** The roles the guide lists and compares. Admin holds everything and isn't presented as a role. */
-export const LISTED_ROLES: UserRole[] = ["SUPERVISOR", "AGENT", "MARKETING"];
+export const LISTED_ROLES: UserRole[] = ["DIRECTOR", "SUPERVISOR", "AGENT", "MARKETING"];
 
 export const ROLE_LABEL: Record<UserRole, string> = {
   ADMIN: "Admin",
+  DIRECTOR: "Director",
   SUPERVISOR: "Supervisor",
   AGENT: "Agent",
   MARKETING: "Marketing",
@@ -66,6 +67,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, "*" | Permission[]> = {
     "team:supervise",
     "campaign:read",
     "stats:read", "stats:team",
+  ],
+  DIRECTOR: [
+    "stats:read", "stats:team", "stats:marketing",
+    "team:supervise",
+    "campaign:read",
+    "user:read",
+    "number:read", "number:use_any",
   ],
   AGENT: [
     "conversation:read", "conversation:write", "conversation:assign",
