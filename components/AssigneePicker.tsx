@@ -133,7 +133,8 @@ export function AssigneePicker({ conversationId, assignee }: { conversationId: s
             aria-label="Assign conversation"
             className="absolute right-0 top-10 z-[61] w-[240px] max-h-[60vh] overflow-y-auto bg-white border border-gray-100 rounded-xl shadow-lg py-1.5"
           >
-            {me && assignee?.id !== me.id && (
+            {/* Admins oversee the inbox but never own chats (the server refuses it). */}
+            {me && me.role !== "ADMIN" && assignee?.id !== me.id && (
               <button
                 type="button"
                 role="option"

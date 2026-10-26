@@ -13,10 +13,11 @@ function formatDate(iso: string): string {
 }
 
 export default function ContactListsPage() {
-  // Viewing lists is list:read (every role); creating, editing, importing into
-  // and deleting them is list:write — agents may use a list, not reshape it.
+  // Viewing lists is list:read; creating, editing, importing into and deleting
+  // them is list:write; starting a campaign from one needs campaign rights.
   const { can } = useCurrentUser();
   const canEdit = can("list:write");
+  const canCampaign = can("campaign:write", "campaign:send");
   const router = useRouter();
 
   const [lists, setLists] = useState<ContactList[]>([]);
@@ -210,6 +211,7 @@ export default function ContactListsPage() {
                   </span>
                   <span className="text-[11px] text-gray-300">{formatDate(l.createdAt)}</span>
                 </div>
+                {canCampaign && (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); router.push(`/campaigns/new?listId=${l.id}`); }}
@@ -220,6 +222,7 @@ export default function ContactListsPage() {
                   <Megaphone className="w-3.5 h-3.5" />
                   Create Campaign
                 </button>
+                )}
               </div>
             ))}
           </div>

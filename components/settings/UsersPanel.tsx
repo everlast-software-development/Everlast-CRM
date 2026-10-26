@@ -238,6 +238,14 @@ function ActionsDropdown({ user, selfId, active, onEdit, onResetPassword, onDeac
 // Create user drawer
 // ---------------------------------------------------------------------------
 
+// The server is the only reliable check (the list on screen can be filtered),
+// so its USERNAME_TAKEN answer is shown right under the field.
+function UsernameTakenNote({ message }: { message: string | null }) {
+  if (!message) return null;
+  return <p className="mt-1.5 text-[12.5px] text-red-500 font-medium">{message}</p>;
+}
+const takenCls = "border-red-400 focus:border-red-400 focus:ring-red-100";
+
 interface CreateDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -251,6 +259,7 @@ function CreateUserDrawer({ open, onClose, onCreated }: CreateDrawerProps) {
   const [role, setRole] = useState<UserRole>("AGENT");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usernameTaken, setUsernameTaken] = useState<string | null>(null);
   const usernameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -260,6 +269,7 @@ function CreateUserDrawer({ open, onClose, onCreated }: CreateDrawerProps) {
       setPassword("");
       setRole("AGENT");
       setError(null);
+      setUsernameTaken(null);
       setTimeout(() => usernameRef.current?.focus(), 150);
     }
   }, [open]);
@@ -280,6 +290,11 @@ function CreateUserDrawer({ open, onClose, onCreated }: CreateDrawerProps) {
       onCreated();
       onClose();
     } catch (err) {
+      if (err instanceof ApiError && err.code === "USERNAME_TAKEN") {
+        setUsernameTaken(err.message);
+        usernameRef.current?.focus();
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to create user");
     } finally {
       setSubmitting(false);
@@ -296,7 +311,20 @@ function CreateUserDrawer({ open, onClose, onCreated }: CreateDrawerProps) {
 
         <div>
           <label className={labelCls}>Username <span className="text-red-500">*</span></label>
-          <input ref={usernameRef} type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. jane.smith" className={inputCls} autoComplete="off" />
+          <input
+            ref={usernameRef}
+            type="text"
+            value={username}
+            onChange={(e) => {
+              setUsername(e.target.value);
+              setUsernameTaken(null);
+            }}
+            placeholder="e.g. jane.smith"
+            className={`${inputCls} ${usernameTaken ? takenCls : ""}`}
+            aria-invalid={Boolean(usernameTaken)}
+            autoComplete="off"
+          />
+          <UsernameTakenNote message={usernameTaken} />
         </div>
 
         <div>
@@ -347,6 +375,7 @@ function EditUserDrawer({ open, user, onClose, onSaved }: EditDrawerProps) {
   const [role, setRole] = useState<UserRole>("AGENT");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usernameTaken, setUsernameTaken] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && user) {
@@ -354,6 +383,7 @@ function EditUserDrawer({ open, user, onClose, onSaved }: EditDrawerProps) {
       setUsername(user.username);
       setRole(user.role);
       setError(null);
+      setUsernameTaken(null);
     }
   }, [open, user]);
 
@@ -374,6 +404,10 @@ function EditUserDrawer({ open, user, onClose, onSaved }: EditDrawerProps) {
       onSaved();
       onClose();
     } catch (err) {
+      if (err instanceof ApiError && err.code === "USERNAME_TAKEN") {
+        setUsernameTaken(err.message);
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to update user");
     } finally {
       setSubmitting(false);
@@ -390,7 +424,19 @@ function EditUserDrawer({ open, user, onClose, onSaved }: EditDrawerProps) {
 
         <div>
           <label className={labelCls}>Username <span className="text-red-500">*</span></label>
-          <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. jane.smith" className={inputCls} autoComplete="off" />
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => {
+              setUsername(e.target.value);
+              setUsernameTaken(null);
+            }}
+            placeholder="e.g. jane.smith"
+            className={`${inputCls} ${usernameTaken ? takenCls : ""}`}
+            aria-invalid={Boolean(usernameTaken)}
+            autoComplete="off"
+          />
+          <UsernameTakenNote message={usernameTaken} />
         </div>
 
         <div>

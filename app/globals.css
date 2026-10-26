@@ -28,6 +28,31 @@
   --color-wall-ink: #0f1d16;
 }
 
+/* Tailwind 4 gives buttons the plain arrow cursor. Everything clickable gets
+   the hand; disabled controls say "not allowed". Classes like cursor-grab or
+   cursor-default on an element still win (utilities beat this base layer). */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"],
+  [role="tab"],
+  [role="option"],
+  summary,
+  select:not(:disabled),
+  label[for],
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -402,4 +427,16 @@ body {
   --em-rgb-accent: 124, 196, 154;
   --em-rgb-background: 27, 43, 34;
   --em-rgb-color: 226, 233, 229;
+}
+
+/* Flow builder canvas: a normal arrow (left-drag draws a selection box, it
+   doesn't move the canvas); the grabbing hand only while actually moving it
+   (middle/right drag). Steps keep their own grab cursor for dragging. */
+.flow-canvas .react-flow__pane,
+.flow-canvas .react-flow__pane.draggable,
+.flow-canvas .react-flow__pane.selection {
+  cursor: default;
+}
+.flow-canvas .react-flow__pane.dragging {
+  cursor: grabbing;
 }

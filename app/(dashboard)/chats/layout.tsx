@@ -13,8 +13,7 @@ import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { PageSpinner } from "@/components/ui/spinner";
 import { homePathFor } from "@/lib/permissions";
 import { ConversationsContext } from "@/components/ConversationsContext";
-import { MyStatusMenu } from "@/components/MyStatusMenu";
-import type { ConversationCounts, ConversationView, User } from "@/types";
+import type { ConversationCounts, ConversationView } from "@/types";
 import { isWindowClosed } from "@/lib/messagingWindow";
 import { OUTCOME_CHIP, OUTCOME_LABEL, OVERDUE_CHIP, activeOutcome, fmtElapsed, fmtWhen, isOverdue, waitTone, type InboxConversation } from "@/lib/chatOutcome";
 
@@ -170,7 +169,6 @@ export default function ChatsLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState("All");
   const [view, setView] = useState<ConversationView>("all");
-  const [user, setUser] = useState<User | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const activeId = pathname.startsWith("/chats/") ? pathname.split("/chats/")[1] : null;
@@ -198,15 +196,6 @@ export default function ChatsLayout({ children }: { children: ReactNode }) {
     () => ({ conversations, loading, markRead }),
     [conversations, loading, markRead],
   );
-
-  useEffect(() => {
-    const raw = localStorage.getItem("user");
-    if (raw) {
-      try {
-        setUser(JSON.parse(raw));
-      } catch {}
-    }
-  }, []);
 
 
   async function handleLogout() {
@@ -375,7 +364,7 @@ export default function ChatsLayout({ children }: { children: ReactNode }) {
 
           {/* Views (server-side) */}
           <div role="tablist" aria-label="Inbox view" className="flex gap-4 px-4 mb-3 border-b border-gray-100 overflow-x-auto [scrollbar-width:thin] [scrollbar-color:rgba(59,105,76,0.25)_transparent] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-brand/25 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-brand/50">
-            {VIEWS.map((v) => {
+            {VIEWS.filter((v) => !(v.value === "mine" && me?.role === "ADMIN")).map((v) => {
               const active = view === v.value;
               const n = v.count && counts ? counts[v.count] : 0;
               return (
@@ -601,19 +590,6 @@ export default function ChatsLayout({ children }: { children: ReactNode }) {
             )}
           </div>
 
-          {/* Bottom user bar */}
-          <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-100">
-            <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-white font-semibold text-[12px] shrink-0">
-              {user ? getInitials(user.username) : "—"}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-gray-900 leading-snug">
-                {user?.username ?? "—"}
-              </p>
-              {/* Own presence (Online / On break) and the end-of-shift hand-over. */}
-              <MyStatusMenu roleLabel={user?.role ?? "Agent"} />
-            </div>
-          </div>
         </aside>
 
         {/* Main content */}

@@ -18,7 +18,7 @@ const STATUS: Record<UserStatus, { dot: string; label: string }> = {
   OFFLINE: { dot: "bg-gray-300", label: "Offline" },
 };
 
-export function MyStatusMenu({ roleLabel }: { roleLabel?: string | null }) {
+export function MyStatusMenu({ roleLabel, menuClassName = "left-0 bottom-7" }: { roleLabel?: string | null; menuClassName?: string }) {
   const { me, can } = useCurrentUser();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -77,7 +77,7 @@ export function MyStatusMenu({ roleLabel }: { roleLabel?: string | null }) {
       {open && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
-          <div role="menu" aria-label="Your status" className="absolute left-0 bottom-7 z-[61] w-[220px] bg-white border border-gray-100 rounded-xl shadow-lg py-1.5">
+          <div role="menu" aria-label="Your status" className={`absolute ${menuClassName} z-[61] w-[220px] bg-white border border-gray-100 rounded-xl shadow-lg py-1.5`}>
             <p className="px-3 pt-1 pb-1 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Status</p>
             {(["ONLINE", "ON_BREAK"] as const).map((v) => (
               <button key={v} type="button" role="menuitem" onClick={() => setStatus(v)} className={`${item} text-gray-700 hover:bg-gray-50`}>

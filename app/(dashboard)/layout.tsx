@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { getSocket, disconnectSocket } from "@/lib/socket";
 import { apiLogout, apiGetLineCounts, apiGetPendingApprovals } from "@/lib/api";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WhatsAppNumberProvider, useActiveNumber } from "@/components/WhatsAppNumberProvider";
 import { NumberSwitcher } from "@/components/NumberSwitcher";
 import { ThemeSwitcher, ThemeToggleButton } from "@/components/ThemeToggle";
@@ -34,6 +34,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import DevCostTracker from "@/components/DevCostTracker";
 import TemplateStatusWatcher from "@/components/TemplateStatusWatcher";
 import HandoffNotifier from "@/components/HandoffNotifier";
+import { MyStatusMenu } from "@/components/MyStatusMenu";
 
 
 const COLLAPSED_W = "w-14";   // 56px icon rail
@@ -42,6 +43,67 @@ const EXPANDED_W  = "w-[260px]";
 // The provider sits ABOVE the shell so the switcher itself is outside the
 // remount boundary below — switching must not unmount the control you just used.
 // Rendered inside CurrentUserProvider so it can ask for the permission.
+// Collapsed sidebar: names an icon on hover / keyboard focus, to the right of
+// it. Off when the sidebar is expanded — the label is already on screen.
+function SideTip({ label, show, children }: { label: string; show: boolean; children: React.ReactElement }) {
+  if (!show) return children;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={10} className="text-[12.5px] font-medium">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+const ROLE_WORDS: Record<string, string> = { ADMIN: "Admin", MARKETING: "Marketing", SUPERVISOR: "Supervisor", AGENT: "Agent" };
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "—";
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : parts[0].slice(0, 2)).toUpperCase();
+}
+
+// Who is signed in, at the bottom of the main sidebar: name, role and — for
+// the people who work the inbox in shifts — their status and hand-over menu.
+// Admins don't take breaks or hand over a queue, so they just see their role.
+// Collapsed, it's the initials; clicking them opens the sidebar.
+function SidebarUser({ expanded, onExpand }: { expanded: boolean; onExpand?: () => void }) {
+  const { me } = useCurrentUser();
+  if (!me) return null;
+  const display = me.name || me.username;
+  const role = ROLE_WORDS[me.role] ?? me.role;
+  const showsStatus = me.role !== "ADMIN" && me.role !== "MARKETING";
+  const avatar = (
+    <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-white font-semibold text-[12px] shrink-0">
+      {initials(display)}
+    </div>
+  );
+  if (!expanded) {
+    return (
+      <SideTip show label={`${display} · ${role}`}>
+        <button type="button" onClick={onExpand} aria-label={`${display}, ${role}`} className="flex w-full justify-center py-1 rounded-xl hover:bg-gray-50">
+          {avatar}
+        </button>
+      </SideTip>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 px-2 py-1">
+      {avatar}
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold text-gray-900 leading-snug truncate" title={me.username}>{display}</p>
+        {showsStatus ? (
+          <MyStatusMenu roleLabel={role} menuClassName="-left-12 bottom-8" />
+        ) : (
+          <p className="text-[12px] text-gray-500 leading-snug">{role}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AdminDevCostTracker() {
   const { can } = useCurrentUser();
   return can("dev:tools") ? <DevCostTracker /> : null;
@@ -242,30 +304,33 @@ function DashboardShell({ children }: { children: ReactNode }) {
 
     if (!enabled || !href) {
       return (
-        <div title={!expanded ? label : undefined}
-          className={`${base} ${expanded ? "gap-3 px-3" : "justify-center"} text-gray-300 cursor-default`}>
+        <SideTip show={!expanded} label={label}>
+          <div className={`${base} ${expanded ? "gap-3 px-3" : "justify-center"} text-gray-300 cursor-default`}>
+            {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-brand rounded-r-full" />}
+            {iconEl}
+            {labelEl}
+            {badgeEl}
+          </div>
+        </SideTip>
+      );
+    }
+    return (
+      <SideTip show={!expanded} label={badgeLabel ? `${label} · ${badgeLabel}` : label}>
+        <Link
+          href={href}
+          aria-label={!expanded ? label : undefined}
+          className={`${base} ${expanded ? "gap-3 px-3" : "justify-center"} ${
+            active
+              ? "bg-brand-100 text-brand-fg"
+              : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+          }`}
+        >
           {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-brand rounded-r-full" />}
           {iconEl}
           {labelEl}
           {badgeEl}
-        </div>
-      );
-    }
-    return (
-      <Link
-        href={href}
-        title={!expanded ? label : undefined}
-        className={`${base} ${expanded ? "gap-3 px-3" : "justify-center"} ${
-          active
-            ? "bg-brand-100 text-brand-fg"
-            : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
-        }`}
-      >
-        {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-brand rounded-r-full" />}
-        {iconEl}
-        {labelEl}
-        {badgeEl}
-      </Link>
+        </Link>
+      </SideTip>
     );
   };
 
@@ -306,13 +371,14 @@ function DashboardShell({ children }: { children: ReactNode }) {
   /* ── desktop Contacts item: expands into a Contacts / Lists sub-menu ── */
   const DesktopContactsNav = () => (
     <div>
+      <SideTip show={!expanded} label="Contacts">
       <button
         type="button"
         onClick={() => {
           if (!expanded) setExpanded(true);
           setContactsOpen((v) => !v);
         }}
-        title={!expanded ? "Contacts" : undefined}
+        aria-label={!expanded ? "Contacts" : undefined}
         className={`relative flex items-center h-10 w-full rounded-xl transition-colors overflow-hidden ${
           expanded ? "gap-3 px-3" : "justify-center"
         } ${contactsActive ? "bg-brand-100 text-brand-fg" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"}`}
@@ -332,6 +398,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
           <ChevronDown className={`w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform duration-200 ${contactsOpen ? "rotate-180" : ""}`} />
         )}
       </button>
+      </SideTip>
 
       {expanded && (
         <div
@@ -348,22 +415,26 @@ function DashboardShell({ children }: { children: ReactNode }) {
             >
               Contacts
             </Link>
-            <Link
-              href="/customers/lists"
-              className={`relative flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] transition-colors ${
-                listsActive ? "bg-brand-100 text-brand-fg font-medium" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
-              }`}
-            >
-              Lists
-            </Link>
-            <Link
-              href="/customers/segments"
-              className={`relative flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] transition-colors ${
-                segmentsActive ? "bg-brand-100 text-brand-fg font-medium" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
-              }`}
-            >
-              Segments
-            </Link>
+            {can("list:read") && (
+              <Link
+                href="/customers/lists"
+                className={`relative flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] transition-colors ${
+                  listsActive ? "bg-brand-100 text-brand-fg font-medium" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                }`}
+              >
+                Lists
+              </Link>
+            )}
+            {can("segment:read") && (
+              <Link
+                href="/customers/segments"
+                className={`relative flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] transition-colors ${
+                  segmentsActive ? "bg-brand-100 text-brand-fg font-medium" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                }`}
+              >
+                Segments
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -401,24 +472,28 @@ function DashboardShell({ children }: { children: ReactNode }) {
           >
             Contacts
           </Link>
-          <Link
-            href="/customers/lists"
-            onClick={() => setMobileOpen(false)}
-            className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] transition-colors ${
-              listsActive ? "bg-brand-100 text-brand-fg font-medium" : "text-gray-500 hover:bg-gray-50"
-            }`}
-          >
-            Lists
-          </Link>
-          <Link
-            href="/customers/segments"
-            onClick={() => setMobileOpen(false)}
-            className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] transition-colors ${
-              segmentsActive ? "bg-brand-100 text-brand-fg font-medium" : "text-gray-500 hover:bg-gray-50"
-            }`}
-          >
-            Segments
-          </Link>
+          {can("list:read") && (
+            <Link
+              href="/customers/lists"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] transition-colors ${
+                listsActive ? "bg-brand-100 text-brand-fg font-medium" : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              Lists
+            </Link>
+          )}
+          {can("segment:read") && (
+            <Link
+              href="/customers/segments"
+              onClick={() => setMobileOpen(false)}
+              className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] transition-colors ${
+                segmentsActive ? "bg-brand-100 text-brand-fg font-medium" : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              Segments
+            </Link>
+          )}
         </div>
       </div>
     </div>
@@ -478,6 +553,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
           )}
         </nav>
         <div className="shrink-0 border-t border-gray-100 p-2 space-y-1">
+          <SidebarUser expanded />
           <ThemeSwitcher withLabels />
           <button
             onClick={() => { setMobileOpen(false); handleLogout(); }}
@@ -531,9 +607,10 @@ function DashboardShell({ children }: { children: ReactNode }) {
 
         {/* Expand / collapse toggle */}
         <div className="shrink-0 border-t border-gray-100 p-2">
+          <SideTip show={!expanded} label="Expand menu">
           <button
             onClick={toggleExpanded}
-            title={expanded ? "Collapse" : "Expand"}
+            aria-label={expanded ? "Collapse menu" : "Expand menu"}
             className={`flex items-center h-10 w-full rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors overflow-hidden ${expanded ? "gap-3 px-3" : "justify-center"}`}
           >
             {expanded
@@ -543,13 +620,20 @@ function DashboardShell({ children }: { children: ReactNode }) {
               Collapse
             </span>
           </button>
+          </SideTip>
+        </div>
+
+        {/* Signed-in user */}
+        <div className="shrink-0 border-t border-gray-100 p-2">
+          <SidebarUser expanded={expanded} onExpand={toggleExpanded} />
         </div>
 
         {/* Logout */}
         <div className="shrink-0 border-t border-gray-100 p-2">
+          <SideTip show={!expanded} label="Sign out">
           <button
             onClick={handleLogout}
-            title="Sign out"
+            aria-label={!expanded ? "Sign out" : undefined}
             className={`flex items-center h-10 w-full rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors overflow-hidden ${expanded ? "gap-3 px-3" : "justify-center"}`}
           >
             <LogOut className="w-[18px] h-[18px] shrink-0" />
@@ -557,6 +641,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
               Sign out
             </span>
           </button>
+          </SideTip>
         </div>
       </div>
 
