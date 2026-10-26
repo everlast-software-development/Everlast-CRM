@@ -19,6 +19,7 @@ import {
 import type { Customer, Conversation, Template, SegmentDefinition } from "@/types";
 import SegmentBuilder from "@/components/SegmentBuilder";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
+import { isMarketingTemplate } from "@/components/OptOut";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1044,6 +1045,8 @@ interface SendTemplateDrawerProps {
 function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerProps) {
   const router = useRouter();
   const open = customer !== null;
+  // Agents send general and utility templates only; marketing ones stay hidden.
+  const canMarketing = useCurrentUser().can("template:send_marketing");
 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -1056,11 +1059,12 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
     setLoadingTemplates(true);
     apiGetTemplates({ status: "APPROVED" })
       .then((res) => {
-        setTemplates(res.data.filter((t) => t.category === "GENERAL" || t.category === "CAMPAIGN"));
+        // Not-yet-set-up imported templates can't be sent (needsSetup).
+        setTemplates(res.data.filter((t) => (t.category === "GENERAL" || t.category === "CAMPAIGN") && !t.needsSetup?.length && (canMarketing || !isMarketingTemplate(t))));
       })
       .catch(() => setTemplates([]))
       .finally(() => setLoadingTemplates(false));
-  }, [open]);
+  }, [open, canMarketing]);
 
   async function handleSend() {
     if (!customer || selected == null) return;

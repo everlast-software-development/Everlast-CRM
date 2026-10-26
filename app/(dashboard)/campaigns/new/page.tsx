@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Check, ArrowLeft, Loader2, Search, ChevronRight, ChevronLeft, Lock, Send, AlertCircle, ShieldCheck, Clock } from "lucide-react";
 import type { Template, Customer, Conversation, ContactList, Segment, CampaignCategory, CampaignCapacity } from "@/types";
 import {
+  ApiError,
+  apiCampaignNameAvailable,
   apiGetTemplates,
   apiGetCampaign,
   apiGetCustomers,
@@ -212,7 +214,9 @@ function Step1({
 
   useEffect(() => {
     apiGetTemplates({ status: "APPROVED", category: "CAMPAIGN" })
-      .then((res) => setTemplates(res.data))
+      // An imported template whose variables/media aren't set up can't be
+      // sent (the API refuses it: TEMPLATE_NEEDS_SETUP / TEMPLATE_NEEDS_MEDIA).
+      .then((res) => setTemplates(res.data.filter((t) => !t.needsSetup?.length)))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -910,6 +914,8 @@ function Step3({
   customers,
   campaignName,
   onNameChange,
+  nameTaken,
+  nameInputRef,
   category,
   onCategoryChange,
   flowId,
@@ -928,6 +934,9 @@ function Step3({
   customers: Customer[];
   campaignName: string;
   onNameChange: (v: string) => void;
+  // The server's CAMPAIGN_NAME_TAKEN answer, shown right under the name field.
+  nameTaken: string | null;
+  nameInputRef: React.RefObject<HTMLInputElement | null>;
   category: CampaignCategory | null;
   onCategoryChange: (v: CampaignCategory) => void;
   flowId: number | null;
@@ -1056,11 +1065,14 @@ function Step3({
         <div>
           <label className="block text-[12px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Campaign name</label>
           <input
+            ref={nameInputRef}
             value={campaignName}
             onChange={(e) => onNameChange(e.target.value)}
             placeholder="My campaign"
-            className="w-full px-4 py-2.5 text-[14px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+            aria-invalid={Boolean(nameTaken)}
+            className={`w-full px-4 py-2.5 text-[14px] border rounded-xl focus:outline-none focus:ring-2 ${nameTaken ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-gray-200 focus:ring-brand/20 focus:border-brand"}`}
           />
+          {nameTaken && <p className="mt-1.5 text-[12.5px] text-red-500 font-medium">{nameTaken}</p>}
         </div>
 
         {/* Automation answering the template's buttons */}
@@ -1407,6 +1419,26 @@ function NewCampaignContent() {
   const [convMap, setConvMap] = useState<Map<number, Conversation>>(new Map());
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [campaignName, setCampaignName] = useState("");
+  // Campaign names are unique (case-insensitive). A CAMPAIGN_NAME_TAKEN answer
+  // from any save lands here; the wizard goes to the review step (where the
+  // name field is) and focuses it.
+  const [nameTaken, setNameTaken] = useState<string | null>(null);
+  const [focusNameTick, setFocusNameTick] = useState(0);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const changeCampaignName = (v: string) => {
+    setCampaignName(v);
+    setNameTaken(null);
+  };
+  const showNameTaken = (err: unknown) => {
+    if (!(err instanceof ApiError && err.code === "CAMPAIGN_NAME_TAKEN")) return false;
+    setNameTaken(err.message);
+    setStep(3);
+    setFocusNameTick((t) => t + 1);
+    return true;
+  };
+  useEffect(() => {
+    if (focusNameTick) nameInputRef.current?.focus();
+  }, [focusNameTick]);
   const [category, setCategory] = useState<CampaignCategory | null>(null);
   const [flowId, setFlowId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -1569,7 +1601,15 @@ function NewCampaignContent() {
   useEffect(() => {
     if (selectedTemplate && !campaignName) {
       const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      setCampaignName(`${selectedTemplate.name} · ${today}`);
+      const suggested = `${selectedTemplate.name} · ${today}`;
+      setCampaignName(suggested);
+      // Names are unique: if today's default is already used, take the first
+      // free "… (2)", "… (3)" — unless the user has typed their own meanwhile.
+      apiCampaignNameAvailable(suggested)
+        .then((res) => {
+          if (!res.data.available) setCampaignName((cur) => (cur === suggested ? res.data.suggestion : cur));
+        })
+        .catch(() => {});
     }
   }, [selectedTemplate, campaignName]);
 
@@ -1635,6 +1675,7 @@ function NewCampaignContent() {
       toast.success("Draft saved.");
       router.push("/campaigns");
     } catch (err) {
+      if (showNameTaken(err)) return;
       toast.error(err instanceof Error ? err.message : "Couldn't save draft. Please try again.");
     } finally {
       setSavingDraft(false);
@@ -1684,6 +1725,7 @@ function NewCampaignContent() {
       toast.success(scheduledAt ? "Campaign scheduled." : "Campaign is sending now.");
       router.push("/campaigns");
     } catch (err) {
+      if (showNameTaken(err)) return;
       toast.error(
         err instanceof Error
           ? err.message
@@ -1801,7 +1843,9 @@ function NewCampaignContent() {
                 selectedIds={selectedIds}
                 customers={customers}
                 campaignName={campaignName}
-                onNameChange={setCampaignName}
+                onNameChange={changeCampaignName}
+                nameTaken={nameTaken}
+                nameInputRef={nameInputRef}
                 category={category}
                 onCategoryChange={setCategory}
                 flowId={flowId}

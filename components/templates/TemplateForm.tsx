@@ -17,7 +17,7 @@ import {
   Code,
   Smile,
 } from "lucide-react";
-import { apiCreateTemplate, apiUpdateTemplate, apiUploadToMediaLibrary } from "@/lib/api";
+import { ApiError, apiCreateTemplate, apiUpdateTemplate, apiUploadToMediaLibrary } from "@/lib/api";
 import MediaPicker, { ACCEPT_BY_TYPE } from "@/components/MediaPicker";
 import {
   LIMITS,
@@ -64,10 +64,16 @@ export default function TemplateForm({
     fix?.field === field ? "rounded-xl ring-2 ring-red-300 ring-offset-4 ring-offset-white" : "";
   const isEditing = !!template;
   const [name, setName] = useState(template?.name ?? "");
+  // The server's TEMPLATE_NAME_TAKEN answer (names are unique per business
+  // account), shown right under the name field.
+  const [nameTaken, setNameTaken] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<TemplateCategory>(
     template?.category ?? "GENERAL",
   );
   const [language, setLanguage] = useState(template?.language ?? "en_US");
+  // Arabic templates are typed and previewed right-to-left.
+  const dir = language.startsWith("ar") ? "rtl" : "ltr";
   const [headerType, setHeaderType] = useState<TemplateHeaderType>(template?.headerType ?? "NONE");
   const [header, setHeader] = useState(template?.header ?? "");
   const [headerMediaUrl, setHeaderMediaUrl] = useState(template?.headerMediaUrl ?? "");
@@ -293,6 +299,11 @@ export default function TemplateForm({
       }
       router.push("/templates");
     } catch (err) {
+      if (err instanceof ApiError && err.code === "TEMPLATE_NAME_TAKEN") {
+        setNameTaken(err.message);
+        nameRef.current?.focus();
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to save template");
     } finally {
       setSaving(false);
@@ -342,14 +353,20 @@ export default function TemplateForm({
                 <CharCount val={name} max={LIMITS.name} />
               </div>
               <input
+                ref={nameRef}
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameTaken(null);
+                }}
                 maxLength={LIMITS.name}
                 placeholder="e.g. Wellness Check"
                 required
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
+                aria-invalid={Boolean(nameTaken)}
+                className={`w-full border rounded-xl px-3 py-2.5 text-[14px] text-gray-800 outline-none ${nameTaken ? "border-red-400 focus:border-red-400 focus:ring-1 focus:ring-red-100" : "border-gray-200 focus:border-brand focus:ring-1 focus:ring-brand/20"}`}
               />
+              {nameTaken && <p className="mt-1.5 text-[12.5px] text-red-500 font-medium">{nameTaken}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -364,9 +381,10 @@ export default function TemplateForm({
                   }
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-800 outline-none focus:border-brand bg-white"
                 >
-                  <option value="GENERAL" disabled={isCarousel}>General{isCarousel ? " (not for carousels)" : ""}</option>
-                  <option value="RE_ENGAGEMENT">Re-engagement</option>
-                  <option value="CAMPAIGN">Campaign</option>
+                  {/* The CRM name, then the category Meta bills and reviews it under. */}
+                  <option value="GENERAL" disabled={isCarousel}>General · Utility{isCarousel ? " (not for carousels)" : ""}</option>
+                  <option value="RE_ENGAGEMENT">Re-engagement · Marketing</option>
+                  <option value="CAMPAIGN">Campaign · Marketing</option>
                 </select>
               </div>
               <div>
@@ -446,6 +464,7 @@ export default function TemplateForm({
                       {...headerAc.fieldProps}
                       maxLength={LIMITS.header}
                       placeholder="e.g. Hi {{first_name}}"
+                      dir={dir}
                       className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
                     />
                     {headerAc.menu}
@@ -542,9 +561,10 @@ export default function TemplateForm({
                   {...bodyAc.fieldProps}
                   maxLength={LIMITS.body}
                   placeholder={`Hi {{customer_name}}, we'd love to reconnect. (Type {{ for placeholders)`}
-                  rows={4}
+                  rows={12}
                   required
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20 resize-none"
+                  dir={dir}
+                  className="w-full min-h-[160px] border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] leading-relaxed text-gray-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20 resize-y"
                 />
                 {bodyAc.menu}
               </div>
@@ -635,6 +655,7 @@ export default function TemplateForm({
                 onChange={(e) => { setFooter(e.target.value); setOptOutOn(e.target.value === OPT_OUT_TEXT); }}
                 maxLength={LIMITS.footer}
                 placeholder="e.g. Everlast Wellness Center"
+                dir={dir}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-[14px] text-gray-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
               />
               <label className="flex items-center gap-2 mt-2 cursor-pointer select-none w-fit">
@@ -813,7 +834,7 @@ export default function TemplateForm({
             {/* Chat body */}
             <div className="px-3 py-4 bg-[#f0ece4]/40">
               <div className="flex justify-end">
-                <div className="bg-brand rounded-2xl rounded-br-sm px-3.5 py-3 max-w-[95%] shadow-sm">
+                <div dir={dir} className="bg-brand rounded-2xl rounded-br-sm px-3.5 py-3 max-w-[95%] shadow-sm">
                   {!isCarousel && <HeaderPreview headerType={headerType} header={header} headerMediaUrl={headerMediaUrl} />}
                   <p className="text-[13px] text-white leading-relaxed whitespace-pre-wrap">
                     {body.trim() ? (

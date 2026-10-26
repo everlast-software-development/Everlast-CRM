@@ -624,6 +624,37 @@ export function apiSyncTemplates() {
   );
 }
 
+// Reads the active line's templates from WhatsApp Manager. dryRun: only
+// report what would happen (nothing is written).
+export function apiImportTemplates(dryRun: boolean) {
+  return apiFetch<import("@/types").TemplateImportResult>("/api/templates/import", {
+    method: "POST",
+    body: JSON.stringify({ dryRun }),
+  });
+}
+
+// What each {{n}} of an imported template means, e.g. { "1": "first_name" }.
+// The header has its own numbering (at most {{1}}).
+export function apiMapTemplateVariables(
+  id: number,
+  mapping: Record<string, string>,
+  headerMapping?: Record<string, string>,
+) {
+  return apiFetch<import("@/types").TemplateResponse>(`/api/templates/${id}/map-variables`, {
+    method: "POST",
+    body: JSON.stringify({ mapping, ...(headerMapping ? { headerMapping } : {}) }),
+  });
+}
+
+// A media file of our own for an imported template (in place of Meta's
+// expiring sample). cards: one entry per card; an empty mediaUrl keeps it.
+export function apiSetTemplateMedia(id: number, data: { headerMediaUrl?: string; cards?: { mediaUrl: string }[] }) {
+  return apiFetch<import("@/types").TemplateResponse>(`/api/templates/${id}/media`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 // Campaigns
 export function apiGetCampaigns() {
   return apiFetch<import("@/types").CampaignListResponse>("/api/campaigns");
@@ -660,6 +691,13 @@ export function apiDevBilling(since?: string) {
 
 export function apiGetQuietHours() {
   return apiFetch<{ success: boolean; data: import("@/lib/quietHours").QuietHours }>("/api/campaigns/quiet-hours");
+}
+
+/** Whether a campaign name is free; `suggestion` is the first free "X", "X (2)"… (names are unique, case-insensitive). */
+export function apiCampaignNameAvailable(name: string) {
+  return apiFetch<{ success: boolean; data: { available: boolean; suggestion: string } }>(
+    `/api/campaigns/name-available?name=${encodeURIComponent(name)}`,
+  );
 }
 
 export function apiGetActiveCampaignProgress() {
@@ -709,6 +747,13 @@ export function apiCreateFlow(data: FlowWrite & { name: string; graph: import("@
   return apiFetch<{ success: boolean; data: import("@/types").Flow }>("/api/campaigns/flows", {
     method: "POST",
     body: JSON.stringify(data),
+  });
+}
+
+/** Copies a flow under the first free "X (copy)", "X (copy 2)"… name, so it never fails on a name clash. */
+export function apiDuplicateFlow(id: number) {
+  return apiFetch<{ success: boolean; data: import("@/types").Flow }>(`/api/campaigns/flows/${id}/duplicate`, {
+    method: "POST",
   });
 }
 

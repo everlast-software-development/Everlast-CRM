@@ -228,7 +228,12 @@ export interface StatsAgentsResponse {
   };
 }
 
-export type TemplateStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+// PAUSED / DISABLED: Meta stopped an approved template (quality, blocks).
+export type TemplateStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "PAUSED" | "DISABLED";
+// What a template imported from Meta still lacks before it can be sent:
+// "variables" = {{1}}-style placeholders nobody has said the meaning of;
+// "media" = only Meta's (expiring) sample file for the header or cards.
+export type TemplateSetupNeed = "variables" | "media";
 export type TemplateCategory = "GENERAL" | "RE_ENGAGEMENT" | "CAMPAIGN";
 export type TemplateHeaderType = "NONE" | "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
 export type TemplateButtonType = "QUICK_REPLY" | "URL" | "PHONE_NUMBER";
@@ -263,6 +268,20 @@ export interface Template {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  // Computed by GET /api/templates; non-empty = can't be sent yet.
+  needsSetup?: TemplateSetupNeed[];
+}
+
+export interface TemplateImportResult {
+  success: boolean;
+  dryRun: boolean;
+  // id is null on a dry run.
+  imported: { id: number | null; name: string; metaTemplateName: string; language: string; status: TemplateStatus; needsSetup: TemplateSetupNeed[] }[];
+  // Templates already in the CRM whose Meta status was refreshed.
+  updated: number;
+  skipped: { name: string; language: string; reason: string }[];
+  // Meta had more than the 1,000 templates one import reads.
+  truncated: boolean;
 }
 
 export interface TemplateCardButton {
@@ -753,7 +772,8 @@ export interface FlowRun {
   currentNodeId: string | null;
   data: {
     answers?: Record<string, string>;
-    path?: { node: string; choice?: string; answer?: string; tag?: string; handedOffTo?: string; at: string }[];
+    // from: "earlier message" when the tap was on an older message.
+    path?: { node: string; choice?: string; answer?: string; tag?: string; handedOffTo?: string; from?: string; at: string }[];
   };
   lastError: string | null;
   startedAt: string;

@@ -12,6 +12,8 @@ import {
   Trash2,
   Send,
   AlertCircle,
+  DownloadCloud,
+  Wand2,
 } from "lucide-react";
 import {
   apiGetTemplates,
@@ -22,6 +24,8 @@ import {
 } from "@/lib/api";
 import { HeaderPreview, ButtonRow, WaText } from "@/components/templates/shared";
 import { CarouselPreview } from "@/components/templates/CarouselEditor";
+import ImportFromMetaModal, { SETUP_NEED_LABEL } from "@/components/templates/ImportFromMetaModal";
+import TemplateSetupModal from "@/components/templates/TemplateSetupModal";
 import type {
   Template,
   TemplateCategory,
@@ -61,6 +65,19 @@ const STATUS_CONFIG: Record<
     bg: "bg-red-50",
     text: "text-red-700",
     border: "border-red-200",
+  },
+  // Meta stopped an approved template (quality / blocks). Can't be sent.
+  PAUSED: {
+    label: "Paused by Meta",
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    border: "border-orange-200",
+  },
+  DISABLED: {
+    label: "Disabled by Meta",
+    bg: "bg-gray-100",
+    text: "text-gray-500",
+    border: "border-gray-200",
   },
 };
 
@@ -278,12 +295,16 @@ function TemplateCard({
   onEdit,
   onSubmit,
   onDelete,
+  onSetup,
 }: {
   template: Template;
   onEdit: () => void;
   onSubmit: () => void;
   onDelete: () => void;
+  onSetup: () => void;
 }) {
+  // An imported template the CRM can't send yet (see TemplateSetupModal).
+  const needsSetup = template.needsSetup ?? [];
   const canEdit =
     template.approvalStatus === "DRAFT" ||
     template.approvalStatus === "REJECTED";
@@ -309,8 +330,25 @@ function TemplateCard({
           <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
             <CategoryBadge category={template.category} />
             <TemplateStatusBadge status={template.approvalStatus} />
+            {needsSetup.length > 0 && (
+              <span
+                title={`Can't be sent until you ${needsSetup.map((n) => SETUP_NEED_LABEL[n]).join(" and ")}`}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border bg-amber-50 text-amber-700 border-amber-200"
+              >
+                Needs setup
+              </span>
+            )}
           </div>
         </div>
+
+        {needsSetup.length > 0 && (
+          <div className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-2">
+            <AlertCircle className="w-3 h-3 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-700 leading-snug">
+              Imported from Meta — {needsSetup.map((n) => SETUP_NEED_LABEL[n]).join(" and ")} before it can be sent.
+            </p>
+          </div>
+        )}
 
         {template.approvalStatus === "REJECTED" && template.rejectionReason && (
           <div className="flex items-start gap-1.5 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mt-2">
@@ -358,6 +396,15 @@ function TemplateCard({
         <span className="flex items-center px-3 py-2.5 text-[10px] text-gray-400 flex-1 truncate">
           {template.language}
         </span>
+        {needsSetup.length > 0 && (
+          <button
+            type="button"
+            onClick={onSetup}
+            className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Wand2 className="w-3.5 h-3.5" /> Set up
+          </button>
+        )}
         {canEdit && (
           <button
             type="button"
@@ -427,6 +474,8 @@ export default function TemplatesPage() {
 
   const [submitModal, setSubmitModal] = useState<Template | null>(null);
   const [deleteModal, setDeleteModal] = useState<Template | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [setupModal, setSetupModal] = useState<Template | null>(null);
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
@@ -513,6 +562,20 @@ export default function TemplatesPage() {
         />
       )}
 
+      {importOpen && (
+        <ImportFromMetaModal onClose={() => setImportOpen(false)} onImported={fetchTemplates} />
+      )}
+      {setupModal && (
+        <TemplateSetupModal
+          template={setupModal}
+          onClose={() => setSetupModal(null)}
+          onSaved={() => {
+            setSetupModal(null);
+            fetchTemplates();
+          }}
+        />
+      )}
+
       {news.length > 0 && !hideNews && (
         <div className="flex items-start justify-between gap-3 bg-brand-100 border border-brand/20 rounded-xl px-4 py-3 mb-5">
           <div className="text-[13px] text-gray-700 space-y-0.5">
@@ -554,6 +617,14 @@ export default function TemplatesPage() {
               className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`}
             />
             {syncing ? "Syncing…" : "Sync Status"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="flex items-center gap-2 border border-gray-200 bg-white rounded-xl px-4 py-2 text-[13px] font-medium text-gray-600 hover:bg-gray-50 cursor-pointer transition-colors"
+          >
+            <DownloadCloud className="w-3.5 h-3.5" />
+            Import from Meta
           </button>
           <button
             type="button"
@@ -632,6 +703,7 @@ export default function TemplatesPage() {
               onEdit={() => router.push(`/templates/${tpl.id}/edit`)}
               onSubmit={() => setSubmitModal(tpl)}
               onDelete={() => setDeleteModal(tpl)}
+              onSetup={() => setSetupModal(tpl)}
             />
           ))}
         </div>

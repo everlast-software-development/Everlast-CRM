@@ -70,7 +70,6 @@ import {
 } from "media-chrome/react/media-store";
 import { isWindowClosed } from "@/lib/messagingWindow";
 import { AssigneePicker } from "@/components/AssigneePicker";
-import { ConversationStatusControl } from "@/components/ConversationStatusControl";
 import { ConversationOutcomeControl } from "@/components/ConversationOutcomeControl";
 import { OptOutBanner, isMarketingTemplate, isOptedOut, useOptOutState, type OptOutState } from "@/components/OptOut";
 import type { InboxConversation } from "@/lib/chatOutcome";
@@ -803,6 +802,9 @@ function TemplatePickerModal({
   // The server refused a marketing template: the patient opted out (409 OPTED_OUT).
   const [optOutPrompt, setOptOutPrompt] = useState<"line" | "all" | null>(null);
   const optedOut = isOptedOut(optOut);
+  // Agents send general and utility templates only; marketing ones stay hidden.
+  const { can } = useCurrentUser();
+  const canMarketing = can("template:send_marketing");
   const optOutWhere = optOut?.all ? "all lines" : "this line";
 
   // Outside the 24-hour window only a Meta-approved template can be sent — the
@@ -814,14 +816,16 @@ function TemplatePickerModal({
     apiGetTemplates(windowClosedMode ? { status: "APPROVED" } : { category, status: "APPROVED" })
       .then((res) =>
         setTemplates(
-          windowClosedMode
+          // Imported templates still needing setup (needsSetup) can't be sent.
+          (windowClosedMode
             ? res.data.filter((t) => t.category !== "GENERAL" && !!t.metaTemplateName)
-            : res.data,
+            : res.data
+          ).filter((t) => !t.needsSetup?.length && (canMarketing || !isMarketingTemplate(t))),
         ),
       )
       .catch(() => {})
       .finally(() => setLoadingTpls(false));
-  }, [category, windowClosedMode]);
+  }, [category, windowClosedMode, canMarketing]);
 
   function previewBody(body: string) {
     return body
@@ -924,9 +928,7 @@ function TemplatePickerModal({
                 <div className="px-4 py-8 text-center">
                   <p className="text-[13px] text-gray-400">
                     {templates.length === 0
-                      ? category === "RE_ENGAGEMENT"
-                        ? "No approved re-engagement templates. Ask your admin to create and submit one."
-                        : "No approved templates available."
+                      ? "No approved templates"
                       : "No templates match your search."}
                   </p>
                 </div>
@@ -1645,9 +1647,6 @@ export default function ConversationPage() {
             which patch the conversation list this header reads from. */}
         {conversation && (
           <>
-            <div className="hidden md:block">
-              <ConversationStatusControl conversationId={id} status={conversation.status} />
-            </div>
             <ConversationOutcomeControl
               conversationId={id}
               outcome={(conversation as InboxConversation).outcome ?? null}
