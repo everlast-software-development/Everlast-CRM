@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  parseCSVRows,
   autoMapHeaders,
   guessGender,
   buildMappedCSV,
@@ -22,6 +21,7 @@ import {
   type ImportResult,
   type ImportIssue,
 } from "@/lib/customerImport";
+import { readImportFile, ImportFileError, IMPORT_ACCEPT } from "@/lib/readImportFile";
 import { apiValidateImport, apiImportCustomers } from "@/lib/api";
 
 const STEPS = [
@@ -72,7 +72,7 @@ export default function ImportContactsPage() {
 
   const phoneMapped = (mapping["phone"] ?? -1) >= 0;
   const mappedFields = data ? IMPORT_FIELDS.filter((f) => mapping[f.key] >= 0) : [];
-  const preview = data ? data.rows.slice(0, 5) : [];
+  const preview = data ? data.rows.slice(0, 50) : [];
   const hasDateMapped = DATE_FIELD_KEYS.some((k) => (mapping[k] ?? -1) >= 0);
 
   // Distinct values in the mapped gender column.
@@ -117,10 +117,9 @@ export default function ImportContactsPage() {
     setError(null);
     setParsing(true);
     try {
-      const text = await file.text();
-      const { headers, rows } = parseCSVRows(text);
+      const { headers, rows } = await readImportFile(file);
       if (headers.length === 0 || rows.length === 0) {
-        setError("The CSV is empty or has no data rows.");
+        setError("The file is empty or has no data rows.");
         setData(null);
         return;
       }
@@ -128,8 +127,8 @@ export default function ImportContactsPage() {
       setMapping(autoMapHeaders(headers));
       setValidateResult(null);
       setImportResult(null);
-    } catch {
-      setError("Couldn't read that file.");
+    } catch (err) {
+      setError(err instanceof ImportFileError ? err.message : "Couldn't read that file.");
     } finally {
       setParsing(false);
     }
@@ -323,11 +322,11 @@ export default function ImportContactsPage() {
                     <div className="w-12 h-12 rounded-2xl bg-brand-200 flex items-center justify-center">
                       <svg className="w-6 h-6 text-brand-fg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     </div>
-                    <p className="text-[14px] font-semibold text-gray-700">Drop your CSV here, or click to browse</p>
-                    <p className="text-[12px] text-gray-400">Up to 20,000 rows · .csv</p>
+                    <p className="text-[14px] font-semibold text-gray-700">Drop your CSV or Excel file here, or click to browse</p>
+                    <p className="text-[12px] text-gray-400">Up to 20,000 rows · .csv or .xlsx</p>
                   </>
                 )}
-                <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={(e) => { handleFile(e.target.files?.[0]); e.target.value = ""; }} />
+                <input ref={fileRef} type="file" accept={IMPORT_ACCEPT} className="hidden" onChange={(e) => { handleFile(e.target.files?.[0]); e.target.value = ""; }} />
               </div>
 
               {data && !parsing && (
@@ -451,7 +450,7 @@ export default function ImportContactsPage() {
                 {mappedFields.length === 0 ? (
                   <p className="text-[13px] text-gray-400 py-6 text-center border border-dashed border-gray-200 rounded-xl">Map at least one field to preview your data.</p>
                 ) : (
-                  <div className="overflow-x-auto border border-gray-100 rounded-xl [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-200 [&::-webkit-scrollbar-thumb]:rounded-full">
+                  <div className="overflow-auto max-h-[440px] border border-gray-100 rounded-xl [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-200 [&::-webkit-scrollbar-thumb]:rounded-full">
                     <table className="w-full border-collapse text-left">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">

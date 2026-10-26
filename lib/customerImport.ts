@@ -67,7 +67,7 @@ export type PhoneCountry = CountryCode | "auto";
 // "Auto-detect" reads the country from each number's own code (works worldwide).
 // The specific countries are the fallback for local numbers that carry no code.
 export const COUNTRY_OPTIONS: { value: PhoneCountry; label: string }[] = [
-  { value: "auto", label: "🌐 Auto-detect (UAE for local numbers)" },
+  { value: "auto", label: "🌐 Auto-detect (UAE, then Egypt, for local numbers)" },
   { value: "AE", label: "🇦🇪 UAE (+971)" },
   { value: "EG", label: "🇪🇬 Egypt (+20)" },
   { value: "SA", label: "🇸🇦 Saudi Arabia (+966)" },
@@ -79,19 +79,41 @@ export const COUNTRY_OPTIONS: { value: PhoneCountry; label: string }[] = [
 
 export type PhoneCheck = { valid: boolean; formatted: string; reason?: string };
 
-// Validate/format a phone the same way the backend does, for the live preview.
-// Numbers with a country code auto-detect; bare locals use `country` (or, with
-// "auto" and no code, can't be resolved — 58+ countries would match a 9-digit).
+// Validate/format a phone the same way the backend does (normalizeImportPhone
+// in modules/customers/import.utils.js), for the live preview:
+//   1. With its own code ("+20…", "0020…", or the bare digits "20122…") it is
+//      read as international — any country, the whole Arab world included.
+//   2. Otherwise it is a local number: tried as the chosen country first, then
+//      UAE, then Egypt.
+// Only mobiles pass — a landline can't receive WhatsApp.
+const LOCAL_FALLBACK: CountryCode[] = ["AE", "EG"];
+
+function readMobile(text: string, country?: CountryCode) {
+  try {
+    const pn = parsePhoneNumberFromString(text, country);
+    return pn && pn.isValid() ? pn : null;
+  } catch {
+    return null;
+  }
+}
+
 export function checkPhone(raw: string, country: PhoneCountry): PhoneCheck {
   const s = (raw ?? "").trim();
   if (!s) return { valid: false, formatted: "", reason: "Missing" };
   const intl = s.replace(/^00/, "+"); // a leading 00 is the international prefix
-  // Numbers with their own code auto-detect; code-less ones fall back to the
-  // chosen country, defaulting to UAE.
-  const useCountry: CountryCode = country === "auto" ? "AE" : country;
-  let pn: ReturnType<typeof parsePhoneNumberFromString> | undefined;
-  try { pn = parsePhoneNumberFromString(intl, useCountry); } catch { pn = undefined; }
-  if (pn && pn.isValid()) {
+  const digits = intl.replace(/\D/g, "");
+  let pn = intl.startsWith("+") ? readMobile("+" + digits) : null;
+  // International digits without the "+" (10+ digits, no leading 0).
+  if (!pn && /^[1-9]\d{9,14}$/.test(digits)) pn = readMobile("+" + digits);
+  if (!pn) {
+    const tryOrder = [...new Set([country === "auto" ? null : country, ...LOCAL_FALLBACK].filter((c): c is CountryCode => !!c))];
+    for (const c of tryOrder) {
+      pn = readMobile(intl, c);
+      if (pn && pn.getType() !== "FIXED_LINE") break;
+      pn = null;
+    }
+  }
+  if (pn) {
     if (pn.getType() === "FIXED_LINE") return { valid: false, formatted: pn.number, reason: "Landline — can't receive WhatsApp" };
     return { valid: true, formatted: pn.number };
   }
