@@ -718,6 +718,8 @@ export interface FlowNodeData {
   // message
   mediaType?: FlowMediaType;
   mediaUrl?: string;
+  /** message: one "open link" button instead of reply buttons (e.g. a product page). */
+  link?: { title: string; url: string };
   // message / list / question / assign / end
   text?: string;
   footer?: string;

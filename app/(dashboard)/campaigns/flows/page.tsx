@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CopyPlus, Plus, Trash2, Workflow } from "lucide-react";
-import { apiDeleteFlow, apiDuplicateFlow, apiGetFlows, apiUpdateFlow } from "@/lib/api";
+import { ArrowLeft, ClipboardCopy, CopyPlus, Download, Plus, Trash2, Upload, Workflow } from "lucide-react";
+import { ApiError, apiCreateFlow, apiDeleteFlow, apiDuplicateFlow, apiGetFlow, apiGetFlows, apiGetTemplates, apiUpdateFlow } from "@/lib/api";
+import { FlowFileError, downloadFlowFile, flowFileText, openImportedDraft, parseFlowFile, readFlowFile, relinkTemplates } from "@/lib/flowTransfer";
+import { validateFlow } from "@/lib/flows";
 import type { FlowSummary } from "@/types";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { NoAccess } from "@/components/NoAccess";
@@ -36,6 +38,99 @@ export default function FlowsPage() {
       setDuplicatingId(null);
     }
   };
+
+  // ── Export / import (.flow.json) ──
+  const [exportingId, setExportingId] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const exportFlow = async (f: FlowSummary) => {
+    setExportingId(f.id);
+    try {
+      // Templates give the file each referenced template's name (ids differ per environment).
+      const [flow, templates] = await Promise.all([apiGetFlow(f.id), apiGetTemplates().catch(() => ({ data: [] }))]);
+      downloadFlowFile(flow.data, templates.data);
+    } catch (err) {
+      error(err instanceof Error ? err.message : "Couldn't export the flow");
+    } finally {
+      setExportingId(null);
+    }
+  };
+
+  // Created straight away, turned off, under a free name. A flow that doesn't
+  // pass the checks here (a template that doesn't exist in this account, say)
+  // opens in the builder unsaved instead, to be fixed and saved.
+  const importFile = async (file: File | undefined) => {
+    if (file) await importText(await file.text());
+  };
+
+  // Copy flow puts the flow on the clipboard. Pasted into another flow's
+  // canvas it lands beside the steps there; pasted here (Ctrl+V) it becomes a
+  // new flow, the same as importing the file.
+  const copyFlow = async (f: FlowSummary) => {
+    setExportingId(f.id);
+    try {
+      const [flow, templates] = await Promise.all([apiGetFlow(f.id), apiGetTemplates().catch(() => ({ data: [] }))]);
+      await navigator.clipboard.writeText(flowFileText(flow.data, templates.data));
+      success("Flow copied — paste it into another flow (Ctrl+V) to add its steps, or here to make a new flow");
+    } catch (err) {
+      error(err instanceof Error ? err.message : "Couldn't copy the flow");
+    } finally {
+      setExportingId(null);
+    }
+  };
+
+  const importText = async (text: string) => {
+    setImporting(true);
+    try {
+      const parsed = parseFlowFile(text);
+      const templates = await apiGetTemplates().catch(() => ({ data: [] }));
+      const { graph, missing } = relinkTemplates(parsed.graph, templates.data);
+      const note = missing.length ? ` Pick the template again for: ${missing.join(", ")}.` : "";
+
+      const problems = validateFlow(graph);
+      if (!problems.length) {
+        for (let n = 0; n < 10; n++) {
+          const name = n === 0 ? parsed.name : `${parsed.name} (imported${n > 1 ? ` ${n}` : ""})`;
+          try {
+            const res = await apiCreateFlow({ name, description: parsed.description, graph, isActive: false });
+            success(`Imported as “${name}” — it's off until you turn it on.${note}`);
+            router.push(`/campaigns/flows/${res.data.id}`);
+            return;
+          } catch (err) {
+            if (err instanceof ApiError && err.code === "FLOW_NAME_TAKEN") continue;
+            if (err instanceof ApiError && Array.isArray(err.details?.errors)) break; // open it to fix instead
+            throw err;
+          }
+        }
+      }
+      openImportedDraft(parsed.name, parsed.description, graph);
+      error(`Imported, not saved yet — fix the problems marked on the steps, then save.${note}`);
+      router.push("/campaigns/flows/new?import=1");
+    } catch (err) {
+      error(err instanceof FlowFileError || err instanceof Error ? err.message : "Couldn't import that file");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const importTextRef = useRef(importText);
+  useEffect(() => {
+    importTextRef.current = importText;
+  });
+  useEffect(() => {
+    if (!canWrite) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      if (!readFlowFile(text)) return; // not a flow: leave the paste alone
+      e.preventDefault();
+      void importTextRef.current(text);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [canWrite]);
 
   useEffect(() => {
     if (!ready || !canRead) return;
@@ -90,12 +185,30 @@ export default function FlowsPage() {
           </p>
         </div>
         {canWrite && (
-          <button
-            onClick={() => router.push("/campaigns/flows/new")}
-            className="flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-[#2f5840] px-4 py-2 rounded-xl"
-          >
-            <Plus className="w-4 h-4" /> New flow
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => importRef.current?.click()}
+              disabled={importing}
+              className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-700 border border-gray-200 bg-white hover:bg-gray-50 px-4 py-2 rounded-xl disabled:opacity-60"
+              title="Create a flow from a .flow.json file exported here or in another environment"
+            >
+              <Upload className="w-4 h-4" /> {importing ? "Importing…" : "Import flow"}
+            </button>
+            <button
+              onClick={() => router.push("/campaigns/flows/new")}
+              className="flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-[#2f5840] px-4 py-2 rounded-xl"
+            >
+              <Plus className="w-4 h-4" /> New flow
+            </button>
+            <input
+              ref={importRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = ""; }}
+            />
+          </div>
         )}
       </div>
 
@@ -149,6 +262,24 @@ export default function FlowsPage() {
                   <td className="px-5 py-3 text-gray-400 whitespace-nowrap">{new Date(f.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</td>
                   <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void copyFlow(f)}
+                      disabled={exportingId !== null}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-brand-fg hover:bg-brand-100 disabled:opacity-40"
+                      title="Copy flow — paste it into another flow, or here to make a copy"
+                    >
+                      <ClipboardCopy className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void exportFlow(f)}
+                      disabled={exportingId !== null}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-brand-fg hover:bg-brand-100 disabled:opacity-40"
+                      title="Export this flow (.flow.json)"
+                    >
+                      <Download className={`w-4 h-4 ${exportingId === f.id ? "animate-pulse" : ""}`} />
+                    </button>
                     {canWrite && (
                       <button
                         type="button"

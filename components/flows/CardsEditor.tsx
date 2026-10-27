@@ -6,6 +6,7 @@ import { apiUploadToMediaLibrary } from "@/lib/api";
 import MediaPicker, { ACCEPT_BY_TYPE } from "@/components/MediaPicker";
 import type { FlowCard, MediaAsset } from "@/types";
 import { CARD_LIMITS, flowCardLabel, newFlowCard } from "@/lib/flows";
+import { FormatTextarea } from "./FormatTextarea";
 
 // WhatsApp's interactive carousel rules (validated again on the server):
 // 2–10 cards; every card the same buttons — 1 or 2 quick replies, or a single
@@ -41,35 +42,48 @@ function withLayout(card: FlowCard, layout: Layout, template?: FlowCard): FlowCa
 
 const inputCls = "w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-800 outline-none focus:border-brand bg-white";
 
-export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: (cards: FlowCard[]) => void }) {
+// Every change is "change the current cards", applied to the latest list —
+// never a whole list captured earlier. An upload that finishes after more cards
+// were added used to put the old list back and drop the new cards.
+type CardsUpdate = (prev: FlowCard[]) => FlowCard[];
+
+export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: (update: CardsUpdate) => void }) {
   const layout = layoutOf(cards);
   const [open, setOpen] = useState<number | null>(0);
   const [pickerFor, setPickerFor] = useState<number | null>(null);
   const [uploadingFor, setUploadingFor] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const uploadTarget = useRef<number | null>(null);
+  const uploadTarget = useRef<string | number | null>(null);
 
-  const update = (i: number, patch: Partial<FlowCard>) => onChange(cards.map((c, j) => (j === i ? { ...c, ...patch } : c)));
+  // Cards are addressed by id (falling back to position for cards saved
+  // without one), so a late update still lands on the right card after a reorder.
+  const keyOf = (c: FlowCard, i: number) => c.id ?? i;
+  const updateCard = (key: string | number, change: (c: FlowCard) => FlowCard) =>
+    onChange((prev) => prev.map((c, j) => (keyOf(c, j) === key ? change(c) : c)));
+  const update = (i: number, patch: Partial<FlowCard>) => updateCard(keyOf(cards[i], i), (c) => ({ ...c, ...patch }));
   const setButtonTitle = (i: number, j: number, title: string) =>
-    update(i, { buttons: cards[i].buttons.map((b, k) => (k === j ? { ...b, title } : b)) });
+    updateCard(keyOf(cards[i], i), (c) => ({ ...c, buttons: c.buttons.map((b, k) => (k === j ? { ...b, title } : b)) }));
   const setButtonUrl = (i: number, url: string) =>
-    update(i, { buttons: cards[i].buttons.map((b) => (b.type === "URL" ? { ...b, url } : b)) });
+    updateCard(keyOf(cards[i], i), (c) => ({ ...c, buttons: c.buttons.map((b) => (b.type === "URL" ? { ...b, url } : b)) }));
   const move = (i: number, d: -1 | 1) => {
-    const next = [...cards];
-    [next[i], next[i + d]] = [next[i + d], next[i]];
-    onChange(next);
+    onChange((prev) => {
+      const next = [...prev];
+      [next[i], next[i + d]] = [next[i + d], next[i]];
+      return next;
+    });
     setOpen(i + d);
   };
 
   async function upload(file: File | undefined) {
-    const i = uploadTarget.current;
-    if (!file || i === null) return;
+    const key = uploadTarget.current;
+    if (!file || key === null) return;
+    const i = cards.findIndex((c, j) => keyOf(c, j) === key);
     setUploadingFor(i);
     setUploadError(null);
     try {
       const res = await apiUploadToMediaLibrary(file, file.name);
-      update(i, { mediaUrl: res.data.url, mediaType: file.type.startsWith("video") ? "VIDEO" : "IMAGE" });
+      updateCard(key, (c) => ({ ...c, mediaUrl: res.data.url, mediaType: file.type.startsWith("video") ? "VIDEO" : "IMAGE" }));
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -84,7 +98,10 @@ export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: 
         <select
           className={inputCls}
           value={layout}
-          onChange={(e) => onChange(cards.map((c) => withLayout(c, e.target.value as Layout, cards[0])))}
+          onChange={(e) => {
+            const next = e.target.value as Layout;
+            onChange((prev) => prev.map((c) => withLayout(c, next, prev[0])));
+          }}
         >
           {LAYOUTS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
         </select>
@@ -116,7 +133,7 @@ export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: 
                   <button
                     type="button"
                     disabled={uploadingFor !== null}
-                    onClick={() => { uploadTarget.current = i; fileRef.current?.click(); }}
+                    onClick={() => { uploadTarget.current = keyOf(c, i); fileRef.current?.click(); }}
                     className="flex items-center gap-1 text-[12px] font-semibold text-gray-600 border border-gray-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-60"
                   >
                     <Upload className="w-3.5 h-3.5" /> {uploadingFor === i ? "Uploading…" : "Upload"}
@@ -129,10 +146,10 @@ export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: 
                 </div>
 
                 <div>
-                  <textarea
+                  <FormatTextarea
                     rows={3}
                     value={c.body || ""}
-                    onChange={(e) => update(i, { body: e.target.value })}
+                    onChange={(body) => update(i, { body })}
                     placeholder={"*Ulthera Skin Tightening*\n~3,500 AED~ *From 2,911 AED*"}
                     className={`${inputCls} resize-none font-normal`}
                   />
@@ -164,7 +181,11 @@ export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: 
                   <button
                     type="button"
                     disabled={cards.length <= CARD_LIMITS.min}
-                    onClick={() => { onChange(cards.filter((_, k) => k !== i)); setOpen(null); }}
+                    onClick={() => {
+                      const key = keyOf(c, i);
+                      onChange((prev) => prev.filter((x, k) => keyOf(x, k) !== key));
+                      setOpen(null);
+                    }}
                     className="ml-auto flex items-center gap-1 text-[12px] text-gray-400 hover:text-red-500 px-2 py-1 rounded-md disabled:opacity-30"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Remove card
@@ -179,7 +200,10 @@ export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: 
       {cards.length < CARD_LIMITS.max && (
         <button
           type="button"
-          onClick={() => { onChange([...cards, withLayout(newFlowCard(2), layout, cards[0])]); setOpen(cards.length); }}
+          onClick={() => {
+            onChange((prev) => [...prev, withLayout(newFlowCard(2), layoutOf(prev), prev[0])]);
+            setOpen(cards.length);
+          }}
           className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-brand-fg hover:underline"
         >
           <Plus className="w-3.5 h-3.5" /> Add card ({cards.length}/{CARD_LIMITS.max})

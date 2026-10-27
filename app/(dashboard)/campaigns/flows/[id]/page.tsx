@@ -4,10 +4,11 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReactFlowProvider } from "@xyflow/react";
-import { ArrowLeft, History, Save } from "lucide-react";
+import { ArrowLeft, Download, History, Save } from "lucide-react";
 import { ApiError, apiCreateFlow, apiDuplicateFlow, apiGetAssignableUsers, apiGetFlow, apiGetTemplates, apiUpdateFlow } from "@/lib/api";
 import type { AssignableUser, Flow, FlowGraph, FlowValidationError, Template } from "@/types";
 import { starterGraph } from "@/lib/flows";
+import { downloadFlowFile } from "@/lib/flowTransfer";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { NoAccess } from "@/components/NoAccess";
 import { PageSpinner } from "@/components/ui/spinner";
@@ -29,7 +30,8 @@ const STATUS_WORDS: Record<string, string> = {
 // tab or a dead battery doesn't lose hours of building. It never saves to the
 // server on its own: a flow attached to a running campaign answers patients
 // the moment it's saved, so going live stays a deliberate click.
-type Draft = { graph: FlowGraph; name: string; description: string; at: number; baseUpdatedAt?: string };
+// imported: put here by Import flow (lib/flowTransfer.ts) — opened at once, not offered.
+type Draft = { graph: FlowGraph; name: string; description: string; at: number; baseUpdatedAt?: string; imported?: boolean };
 const draftKey = (flowId: number | null) => `everlast:flow-draft:${flowId ?? "new"}`;
 const readDraft = (key: string): Draft | null => {
   try {
@@ -95,6 +97,8 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
   const builder = useRef<FlowBuilderControl | null>(null);
   // Remounts the builder when a backup is restored (it reads initialGraph once).
   const [builderKey, setBuilderKey] = useState(0);
+  // Show the flow's problems as soon as the builder opens (an imported flow).
+  const [checkOnOpen, setCheckOnOpen] = useState(false);
   const [restorable, setRestorable] = useState<Draft | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [dirtySince, setDirtySince] = useState<number | null>(null);
@@ -151,9 +155,23 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
   // saved version has loaded (see the load above); a new flow checks on mount.
   useEffect(() => {
     if (!isNew) return;
-    const t = setTimeout(() => setRestorable(readDraft(key)), 0);
+    const t = setTimeout(() => {
+      const d = readDraft(key);
+      if (d?.imported) {
+        // An imported flow that needs fixing: open it with its problems marked.
+        setGraph(d.graph);
+        setName(d.name);
+        setDescription(d.description);
+        setCheckOnOpen(true);
+        setBuilderKey((k) => k + 1);
+        setDirty(true);
+        writeDraft(key, { ...d, imported: false }); // from now on, an ordinary backup
+      } else {
+        setRestorable(d);
+      }
+    }, 0);
     return () => clearTimeout(t);
-  }, [isNew, key]);
+  }, [isNew, key, setDirty]);
 
   // Keep the backup current while there are unsaved changes.
   const latestGraph = useRef<FlowGraph | null>(null);
@@ -439,6 +457,21 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
+        {/* The canvas as it is now, unsaved changes included. */}
+        {!responsesOnly && (
+          <button
+            type="button"
+            onClick={() => {
+              const g = builder.current?.snapshot() ?? graph;
+              downloadFlowFile({ name: name.trim() || "Flow", description: description.trim() || null, graph: g }, templates);
+            }}
+            title="Export this flow (.flow.json) — import it on another environment or keep it as a backup"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[13px] font-semibold text-gray-600 hover:bg-gray-50"
+          >
+            <Download className="w-4 h-4" /> Export
+          </button>
+        )}
+
         {canWrite && (
           <div className="flex items-center gap-2.5">
             <span
@@ -513,6 +546,7 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
         <ReactFlowProvider>
           <FlowBuilder
             key={builderKey}
+            checkOnOpen={checkOnOpen}
             initialGraph={graph}
             templates={templates}
             agents={agents}

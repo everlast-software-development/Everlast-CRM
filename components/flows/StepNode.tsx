@@ -1,10 +1,11 @@
 "use client";
 
-import { memo } from "react";
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { AlertCircle, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, Play, GalleryHorizontal, Images, Ban } from "lucide-react";
+import { memo, useEffect } from "react";
+import { Handle, Position, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
+import { AlertCircle, ExternalLink, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, Play, GalleryHorizontal, Images, Ban } from "lucide-react";
 import type { FlowNodeData, FlowNodeType } from "@/types";
 import { STEP_META, outputsOf, previewOf } from "@/lib/flows";
+import { WaText } from "@/components/templates/shared";
 
 export type StepNodeData = FlowNodeData & { problems?: string[]; active?: boolean };
 export type StepFlowNode = Node<StepNodeData, FlowNodeType>;
@@ -25,11 +26,20 @@ const ICONS: Record<FlowNodeType, React.ComponentType<{ className?: string }>> =
 // One card per step. Inputs on the left (every step but Start), one output
 // row per button/option/"then" on the right, each with its own handle so a
 // branch is drawn from exactly the choice it belongs to.
-function StepNodeImpl({ type, data, selected }: NodeProps<StepFlowNode>) {
+function StepNodeImpl({ id, type, data, selected }: NodeProps<StepFlowNode>) {
   const meta = STEP_META[type];
   const Icon = ICONS[type];
   const outputs = outputsOf(type, data);
   const problems = data.problems || [];
+
+  // React Flow measures a step's connection points once. When a button is
+  // added, removed or replaces "Then" (same height, so nothing re-measures),
+  // it must be told — otherwise the new point can't be dragged from.
+  const updateNodeInternals = useUpdateNodeInternals();
+  const handleKey = outputs.map(([h]) => h).join("|");
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, handleKey, updateNodeInternals]);
 
   return (
     <div
@@ -38,7 +48,7 @@ function StepNodeImpl({ type, data, selected }: NodeProps<StepFlowNode>) {
       } ${selected ? "shadow-md ring-2 ring-brand/20" : ""} ${data.active ? "ring-4 ring-amber-300 shadow-lg" : ""}`}
     >
       {type !== "trigger" && (
-        <Handle type="target" position={Position.Left} className="!w-4 !h-4 !bg-white !border-2 !border-gray-400" />
+        <Handle type="target" position={Position.Left} className="flow-handle !w-5 !h-5 !bg-white !border-[3px] !border-gray-400" />
       )}
 
       <div className="flex items-center gap-2.5 px-4 py-3 rounded-t-2xl border-b" style={{ background: `${meta.color}33`, borderColor: `${meta.color}40` }}>
@@ -54,9 +64,16 @@ function StepNodeImpl({ type, data, selected }: NodeProps<StepFlowNode>) {
         {problems.length > 0 && <AlertCircle className={`w-4 h-4 text-red-500 shrink-0 ${data.variable ? "" : "ml-auto"}`} />}
       </div>
 
-      <p className="px-4 py-3 text-[13.5px] text-gray-600 leading-snug line-clamp-4 whitespace-pre-wrap break-words">
-        {previewOf({ type, data })}
+      <p dir="auto" className="px-4 py-3 text-[13.5px] text-gray-600 leading-snug line-clamp-4 whitespace-pre-wrap break-words">
+        <WaText text={previewOf({ type, data })} />
       </p>
+
+      {/* A link button opens a page; it sends nothing back, so it has no branch of its own. */}
+      {type === "message" && data.link && (
+        <div className="mx-4 mb-3 flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 py-1.5 text-[12.5px] font-semibold text-sky-700 truncate">
+          <ExternalLink className="w-3.5 h-3.5 shrink-0" /> {data.link.title || "Link button"}
+        </div>
+      )}
 
       {outputs.length > 0 && (
         <div className="border-t border-gray-100 py-1.5">
@@ -67,7 +84,7 @@ function StepNodeImpl({ type, data, selected }: NodeProps<StepFlowNode>) {
                 type="source"
                 id={handleId}
                 position={Position.Right}
-                className="!w-4 !h-4 !border-2 !border-white"
+                className="flow-handle !w-5 !h-5 !border-[3px] !border-white"
                 style={{ background: meta.color }}
               />
             </div>

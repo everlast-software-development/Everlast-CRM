@@ -4,6 +4,7 @@ import { Plus, Trash2, X } from "lucide-react";
 import type { AssignableUser, FlowInputType, FlowMediaType, FlowNodeData, FlowNodeType, FlowOption, Template } from "@/types";
 import { BUILT_IN_VARIABLES, FLOW_LIMITS, STEP_META, VARIABLE_RE, carouselSnapshot, templateStartButtons, uid } from "@/lib/flows";
 import { CardsEditor } from "./CardsEditor";
+import { FormatTextarea } from "./FormatTextarea";
 
 const inputCls =
   "w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 bg-white";
@@ -123,7 +124,8 @@ export interface StepEditorProps {
   type: FlowNodeType;
   data: FlowNodeData;
   problems: string[];
-  onChange: (data: FlowNodeData) => void;
+  /** Applies a change to the step's latest data. */
+  onChange: (update: (prev: FlowNodeData) => FlowNodeData) => void;
   onDelete: () => void;
   templates: Template[];
   agents: AssignableUser[];
@@ -133,7 +135,8 @@ export interface StepEditorProps {
 
 export function StepEditor({ type, data, problems, onChange, onDelete, templates, agents, variables, readOnly }: StepEditorProps) {
   const meta = STEP_META[type];
-  const set = (patch: Partial<FlowNodeData>) => onChange({ ...data, ...patch });
+  // Always merged into the step's latest data (see FlowBuilder.updateData).
+  const set = (patch: Partial<FlowNodeData>) => onChange((prev) => ({ ...prev, ...patch }));
   const placeholders = [...BUILT_IN_VARIABLES, ...variables];
   const textHelp = (
     <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
@@ -234,37 +237,88 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
                 />
               )}
             </Field>
-            <Field label="Text" aside={<Counter value={data.text} max={data.buttons?.length ? FLOW_LIMITS.body : FLOW_LIMITS.text} />}>
-              <textarea
+            <Field label="Text" aside={<Counter value={data.text} max={data.buttons?.length || data.link ? FLOW_LIMITS.body : FLOW_LIMITS.text} />}>
+              <FormatTextarea
                 rows={5}
                 className={`${inputCls} resize-y`}
                 value={data.text || ""}
                 placeholder="Hi {{first_name}}! Here are our laser packages…"
-                onChange={(e) => set({ text: e.target.value })}
+                onChange={(text) => set({ text })}
               />
               {textHelp}
             </Field>
-            <Field label={`Buttons (${(data.buttons || []).length}/${FLOW_LIMITS.buttons})`}>
-              <OptionsEditor
-                options={data.buttons || []}
-                onChange={(buttons) => set({ buttons })}
-                max={FLOW_LIMITS.buttons}
-                titleMax={FLOW_LIMITS.buttonTitle}
-                noun="Button"
-              />
-              <p className="text-[11px] text-gray-400 mt-2">Each button gets its own branch. No buttons = continue straight to the next step.</p>
+            {/* WhatsApp sends either up to 3 reply buttons or a single link
+                button — never both on one message. */}
+            <Field label="Buttons">
+              <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-gray-100 mb-2.5">
+                {([
+                  ["reply", "Reply buttons"],
+                  ["link", "Link button"],
+                ] as const).map(([mode, label]) => {
+                  const active = mode === "link" ? !!data.link : !data.link;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() =>
+                        mode === "link"
+                          ? set({ link: data.link ?? { title: "View product", url: "" }, buttons: [], variable: undefined })
+                          : set({ link: undefined })
+                      }
+                      className={`rounded-md py-1.5 text-[12px] font-semibold transition-colors ${active ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {data.link ? (
+                <div className="space-y-2">
+                  <div>
+                    <input
+                      className={inputCls}
+                      value={data.link.title}
+                      placeholder="Button text, e.g. View product"
+                      onChange={(e) => set({ link: { ...data.link!, title: e.target.value } })}
+                    />
+                    <div className="flex justify-end mt-0.5"><Counter value={data.link.title} max={FLOW_LIMITS.buttonTitle} /></div>
+                  </div>
+                  <input
+                    className={inputCls}
+                    value={data.link.url}
+                    placeholder="https://… the page it opens"
+                    onChange={(e) => set({ link: { ...data.link!, url: e.target.value.trim() } })}
+                  />
+                  <p className="text-[11px] text-gray-400">
+                    Opens the page in the customer&apos;s browser — e.g. one product. A link sends nothing back, so the flow carries on to the next step right away.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <OptionsEditor
+                    options={data.buttons || []}
+                    onChange={(buttons) => set({ buttons })}
+                    max={FLOW_LIMITS.buttons}
+                    titleMax={FLOW_LIMITS.buttonTitle}
+                    noun="Button"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-2">
+                    {(data.buttons || []).length}/{FLOW_LIMITS.buttons} · Each button gets its own branch. No buttons = continue straight to the next step.
+                  </p>
+                </>
+              )}
             </Field>
+            {((data.buttons || []).length > 0 || !!data.link) && (
+              <Field label="Footer (optional)" aside={<Counter value={data.footer} max={FLOW_LIMITS.footer} />}>
+                <input className={inputCls} value={data.footer || ""} onChange={(e) => set({ footer: e.target.value })} />
+              </Field>
+            )}
             {(data.buttons || []).length > 0 && (
-              <>
-                <Field label="Footer (optional)" aside={<Counter value={data.footer} max={FLOW_LIMITS.footer} />}>
-                  <input className={inputCls} value={data.footer || ""} onChange={(e) => set({ footer: e.target.value })} />
-                </Field>
-                <VariableField
-                  value={data.variable}
-                  onChange={(variable) => set({ variable })}
-                  help="Stores the tapped button's title in the responses, e.g. service = Laser."
-                />
-              </>
+              <VariableField
+                value={data.variable}
+                onChange={(variable) => set({ variable })}
+                help="Stores the tapped button's title in the responses, e.g. service = Laser."
+              />
             )}
           </>
         )}
@@ -275,12 +329,12 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
               <input className={inputCls} value={data.header || ""} onChange={(e) => set({ header: e.target.value })} />
             </Field>
             <Field label="Text" aside={<Counter value={data.text} max={FLOW_LIMITS.body} />}>
-              <textarea
+              <FormatTextarea
                 rows={4}
                 className={`${inputCls} resize-y`}
                 value={data.text || ""}
                 placeholder="Which treatment are you interested in?"
-                onChange={(e) => set({ text: e.target.value })}
+                onChange={(text) => set({ text })}
               />
               {textHelp}
             </Field>
@@ -311,17 +365,20 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
         {type === "cards" && (
           <>
             <Field label="Message above the cards" aside={<Counter value={data.text} max={FLOW_LIMITS.body} />}>
-              <textarea
+              <FormatTextarea
                 rows={3}
                 className={`${inputCls} resize-y`}
                 value={data.text || ""}
                 placeholder="✨ Discover our Skin & Rejuvenation offers — swipe to see them all 👉"
-                onChange={(e) => set({ text: e.target.value })}
+                onChange={(text) => set({ text })}
               />
               {textHelp}
             </Field>
             <Field label="Cards">
-              <CardsEditor cards={data.cards || []} onChange={(cards) => set({ cards })} />
+              <CardsEditor
+                cards={data.cards || []}
+                onChange={(update) => onChange((prev) => ({ ...prev, cards: update(prev.cards || []) }))}
+              />
             </Field>
             <VariableField
               value={data.variable}
@@ -382,12 +439,12 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
         {type === "question" && (
           <>
             <Field label="Question" aside={<Counter value={data.text} max={FLOW_LIMITS.text} />}>
-              <textarea
+              <FormatTextarea
                 rows={4}
                 className={`${inputCls} resize-y`}
                 value={data.text || ""}
                 placeholder="What date would suit you? (DD/MM/YYYY)"
-                onChange={(e) => set({ text: e.target.value })}
+                onChange={(text) => set({ text })}
               />
               {textHelp}
             </Field>
@@ -456,11 +513,11 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
               </select>
             </Field>
             <Field label="Message before handing over (optional)">
-              <textarea
+              <FormatTextarea
                 rows={3}
                 className={`${inputCls} resize-y`}
                 value={data.text || ""}
-                onChange={(e) => set({ text: e.target.value })}
+                onChange={(text) => set({ text })}
               />
               {textHelp}
             </Field>
@@ -472,12 +529,12 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
 
         {type === "end" && (
           <Field label="Closing message (optional)">
-            <textarea
+            <FormatTextarea
               rows={3}
               className={`${inputCls} resize-y`}
               value={data.text || ""}
               placeholder="Thank you! We'll be in touch."
-              onChange={(e) => set({ text: e.target.value })}
+              onChange={(text) => set({ text })}
             />
             {textHelp}
           </Field>

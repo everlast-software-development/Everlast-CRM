@@ -440,3 +440,22 @@ body {
 .flow-canvas .react-flow__pane.dragging {
   cursor: grabbing;
 }
+
+/* Step connection points: bigger, grow on hover, and an invisible ring around
+   each one so a drag that starts a little off the dot still catches it. */
+.flow-canvas .flow-handle {
+  cursor: crosshair;
+  transition: transform 120ms ease;
+}
+.flow-canvas .flow-handle:hover {
+  transform: translate(50%, -50%) scale(1.3);
+}
+.flow-canvas .flow-handle.react-flow__handle-left:hover {
+  transform: translate(-50%, -50%) scale(1.3);
+}
+.flow-canvas .flow-handle::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+}

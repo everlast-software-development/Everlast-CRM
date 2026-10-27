@@ -20,7 +20,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import { ClipboardPaste, Copy, CopyPlus, GripVertical, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, FlaskConical, GalleryHorizontal, Images } from "lucide-react";
 import type { AssignableUser, FlowGraph, FlowNodeData, FlowNodeType, FlowValidationError, Template } from "@/types";
-import { ADDABLE_STEPS, STEP_META, defaultData, outputsOf, uid } from "@/lib/flows";
+import { ADDABLE_STEPS, STEP_META, defaultData, outputsOf, uid, validateFlow } from "@/lib/flows";
+import { readFlowFile, relinkTemplates } from "@/lib/flowTransfer";
 import { StepNode, type StepFlowNode } from "./StepNode";
 import { StepEditor } from "./StepEditor";
 import { FlowSimulator } from "./FlowSimulator";
@@ -79,6 +80,20 @@ const parseClip = (text: string | null | undefined): StepClip | null => {
     return null;
   }
 };
+// A whole flow as steps to paste: everything but its Start step (a flow has
+// exactly one), with the connections between them.
+const clipOfFlow = (graph: FlowGraph): StepClip => {
+  const nodes = graph.nodes.filter((n) => n.type !== "trigger");
+  const ids = new Set(nodes.map((n) => n.id));
+  return {
+    kind: CLIP_KIND,
+    v: 1,
+    nodes: nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
+    edges: graph.edges
+      .filter((e) => ids.has(e.source) && ids.has(e.target))
+      .map((e) => ({ source: e.source, sourceHandle: e.sourceHandle || "next", target: e.target })),
+  };
+};
 const isTyping = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
   return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
@@ -92,6 +107,19 @@ function toRfNodes(graph: FlowGraph): StepFlowNode[] {
     data: { ...n.data },
     deletable: n.type !== "trigger",
   }));
+}
+
+/** The graph as saved: display-only fields dropped, positions rounded. */
+function graphOf(nodes: StepFlowNode[], edges: Edge[]): FlowGraph {
+  return {
+    nodes: nodes.map((n) => {
+      const data: FlowNodeData = { ...n.data };
+      delete data.problems; // display-only, from the last save attempt
+      delete data.active;
+      return { id: n.id, type: n.type, position: { x: Math.round(n.position.x), y: Math.round(n.position.y) }, data };
+    }),
+    edges: edges.map((e) => ({ id: e.id, source: e.source, sourceHandle: e.sourceHandle || "next", target: e.target })),
+  };
 }
 
 function toRfEdges(graph: FlowGraph): Edge[] {
@@ -118,10 +146,12 @@ export interface FlowBuilderProps {
   controlRef?: React.RefObject<FlowBuilderControl | null>;
   /** Every edit, with the current graph — the page keeps a local backup of unsaved work. */
   onGraphChange?: (graph: FlowGraph) => void;
+  /** Mark the flow's problems from the start, before any save (an imported flow). */
+  checkOnOpen?: boolean;
 }
 
 // Saving happens from the page header (Save button, Ctrl+S) through controlRef.
-export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverErrors, onSave, onDirtyChange, controlRef, onGraphChange }: FlowBuilderProps) {
+export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverErrors, onSave, onDirtyChange, controlRef, onGraphChange, checkOnOpen = false }: FlowBuilderProps) {
   const [nodes, setNodes] = useState<StepFlowNode[]>(() => toRfNodes(initialGraph));
   const [edges, setEdges] = useState<Edge[]>(() => toRfEdges(initialGraph));
   const [selectedId, setSelectedId] = useState<string | null>(initialGraph.nodes[0]?.id ?? null);
@@ -138,13 +168,19 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
   const markDirty = useCallback(() => setDirty(true), []);
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
 
-  // Server problems by step, shown on the cards and in the editor.
+  // After a save is refused by the check below, problems are re-checked on
+  // every edit, so each one disappears as soon as it's fixed.
+  const [checked, setChecked] = useState(checkOnOpen);
+  const localErrors = useMemo(() => (checked ? validateFlow(graphOf(nodes, edges)) : []), [checked, nodes, edges]);
+  const shownErrors = checked ? localErrors : serverErrors;
+
+  // Problems by step, shown on the cards and in the editor.
   const problemsByNode = useMemo(() => {
     const m: Record<string, string[]> = {};
-    for (const e of serverErrors) if (e.nodeId) (m[e.nodeId] ||= []).push(e.message);
+    for (const e of shownErrors) if (e.nodeId) (m[e.nodeId] ||= []).push(e.message);
     return m;
-  }, [serverErrors]);
-  const generalProblems = serverErrors.filter((e) => !e.nodeId).map((e) => e.message);
+  }, [shownErrors]);
+  const generalProblems = shownErrors.filter((e) => !e.nodeId).map((e) => e.message);
 
   const displayNodes = useMemo(
     () => nodes.map((n) => ({ ...n, data: { ...n.data, problems: problemsByNode[n.id], active: testing && n.id === activeNodeId } })),
@@ -191,16 +227,22 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
     [nodes],
   );
 
-  const updateData = useCallback((id: string, data: FlowNodeData) => {
+  // Edits arrive as "change the step's current data", applied to the latest
+  // copy in state. An edit that lands late — an image upload finishing, a
+  // library pick — used to be built from the data as it was when it started,
+  // and wrote over everything changed since (cards added meanwhile vanished).
+  const updateData = useCallback((id: string, update: (prev: FlowNodeData) => FlowNodeData) => {
     let type: FlowNodeType | undefined;
+    let data: FlowNodeData | undefined;
     setNodes((ns) => ns.map((n) => {
       if (n.id !== id) return n;
       type = n.type;
+      data = update(n.data);
       return { ...n, data };
     }));
     // A removed button/option takes its branch with it.
     setEdges((es) => {
-      if (!type) return es;
+      if (!type || !data) return es;
       const valid = new Set(outputsOf(type, data).map(([h]) => h));
       return es.filter((e) => e.source !== id || valid.has(e.sourceHandle || "next"));
     });
@@ -331,28 +373,58 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
     toast.success(`Copied ${clip.nodes.length} step${clip.nodes.length > 1 ? "s" : ""} — paste with Ctrl+V, here or in another flow`);
   }, [selectedSteps, clipOf, toast]);
 
-  const pasteSteps = useCallback(async () => {
+  // `text` comes from a real paste (Ctrl+V); the toolbar button reads the
+  // clipboard itself. Copied steps paste into the middle of the view. A whole
+  // flow (Copy flow on the Flows list, or a .flow.json file's text) pastes
+  // beside the existing steps, like n8n — everything but its Start step.
+  const pasteSteps = useCallback(async (text?: string) => {
     let clip: StepClip | null = null;
+    let wholeFlow = false;
     try {
-      clip = parseClip(await navigator.clipboard.readText());
+      const raw = text ?? (await navigator.clipboard.readText());
+      clip = parseClip(raw);
+      const file = clip ? null : readFlowFile(raw);
+      if (file) {
+        clip = clipOfFlow(relinkTemplates(file.graph, templates).graph);
+        wholeFlow = true;
+      }
     } catch {
       /* not allowed to read: fall back to this tab's copy */
     }
-    clip = clip ?? memoryClip;
+    clip = clip ?? (text === undefined ? memoryClip : null);
     if (!clip) {
-      toast.error("Nothing to paste — copy some steps first (Ctrl+C)");
+      if (text === undefined) toast.error("Nothing to paste — copy some steps or a flow first");
       return;
     }
-    // Into the middle of the view, nudged if something is already right there.
-    const box = canvasRef.current?.getBoundingClientRect();
-    const centre = rf && box ? rf.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 }) : { x: 0, y: 0 };
-    let at = { x: centre.x - NODE_W / 2, y: centre.y - NODE_H / 2 };
-    while (nodes.some((n) => Math.abs(n.position.x - at.x) < 40 && Math.abs(n.position.y - at.y) < 40)) {
-      at = { x: at.x + 48, y: at.y + 48 };
+    let at: { x: number; y: number };
+    if (wholeFlow && nodes.length) {
+      // To the right of everything already on the canvas, top-aligned.
+      at = {
+        x: Math.max(...nodes.map((n) => n.position.x)) + NODE_W + 160,
+        y: Math.min(...nodes.map((n) => n.position.y)),
+      };
+    } else {
+      // Into the middle of the view, nudged if something is already right there.
+      const box = canvasRef.current?.getBoundingClientRect();
+      const centre = rf && box ? rf.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 }) : { x: 0, y: 0 };
+      at = { x: centre.x - NODE_W / 2, y: centre.y - NODE_H / 2 };
+      while (nodes.some((n) => Math.abs(n.position.x - at.x) < 40 && Math.abs(n.position.y - at.y) < 40)) {
+        at = { x: at.x + 48, y: at.y + 48 };
+      }
     }
     const n = placeClip(clip, at);
-    if (n) toast.success(`Pasted ${n} step${n > 1 ? "s" : ""}`);
-  }, [rf, nodes, placeClip, toast]);
+    if (!n) {
+      if (wholeFlow) toast.error("That flow only has a Start step — nothing to paste");
+      return;
+    }
+    if (wholeFlow) {
+      // Bring the pasted flow into view.
+      setTimeout(() => rf?.fitView({ duration: 300, padding: 0.15 }), 50);
+      toast.success(`Pasted a flow (${n} step${n > 1 ? "s" : ""}) beside yours — connect your Start step to it`);
+    } else {
+      toast.success(`Pasted ${n} step${n > 1 ? "s" : ""}`);
+    }
+  }, [rf, nodes, placeClip, toast, templates]);
 
   const duplicateSelected = useCallback(() => {
     if (!selectedSteps.length) return;
@@ -372,9 +444,6 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
         if (window.getSelection()?.toString()) return;
         e.preventDefault();
         void copySelected();
-      } else if (k === "v") {
-        e.preventDefault();
-        void pasteSteps();
       } else if (k === "a") {
         // Select every step (not the Start step, which can't be copied).
         e.preventDefault();
@@ -384,23 +453,41 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
         duplicateSelected();
       }
     };
+    // Ctrl+V as a real paste event: it carries the clipboard text, so no
+    // clipboard permission prompt, and pasting into a text box is left alone.
+    const onPaste = (e: ClipboardEvent) => {
+      if (isTyping(e.target)) return;
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      e.preventDefault();
+      void pasteSteps(text);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("paste", onPaste);
+    };
   }, [readOnly, selectedSteps.length, copySelected, pasteSteps, duplicateSelected]);
 
-  const snapshot = (): FlowGraph => ({
-      nodes: nodes.map((n) => {
-        const data: FlowNodeData = { ...n.data };
-        delete data.problems; // display-only, from the last save attempt
-        delete data.active;
-        return { id: n.id, type: n.type, position: { x: Math.round(n.position.x), y: Math.round(n.position.y) }, data };
-      }),
-      edges: edges.map((e) => ({ id: e.id, source: e.source, sourceHandle: e.sourceHandle || "next", target: e.target })),
-  });
+  const snapshot = (): FlowGraph => graphOf(nodes, edges);
 
+  // Checked here first: a flow with problems is never sent, so the canvas is
+  // left exactly as it is and the problems show on the steps straight away.
   const save = async () => {
-    const ok = await onSave(snapshot());
-    if (ok) setDirty(false);
+    const g = snapshot();
+    const problems = validateFlow(g);
+    if (problems.length) {
+      setChecked(true);
+      const first = problems.find((p) => p.nodeId);
+      if (first?.nodeId) setSelectedId(first.nodeId);
+      toast.error(`Not saved — ${problems.length} problem${problems.length > 1 ? "s" : ""} to fix, marked on the steps. Nothing was lost.`);
+      return false;
+    }
+    const ok = await onSave(g);
+    if (ok) {
+      setDirty(false);
+      setChecked(false);
+    }
     return ok;
   };
 
@@ -568,7 +655,7 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
             type={selected.type}
             data={selected.data}
             problems={problemsByNode[selected.id] || []}
-            onChange={(d) => updateData(selected.id, d)}
+            onChange={(update) => updateData(selected.id, update)}
             onDelete={() => deleteNode(selected.id)}
             templates={templates}
             agents={agents}

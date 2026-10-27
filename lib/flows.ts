@@ -203,5 +203,101 @@ export function flowCardLabel(c: import("@/types").FlowCard, i: number): string 
   return first || c.label || `Card ${i + 1}`;
 }
 
+// ── Checking a flow before it is sent to the server ─────────────────────────
+
+/**
+ * The step-level checks of the server's validateGraph (utils/flowGraph.js),
+ * run in the browser before saving: a flow with problems is never sent, so
+ * nothing on the canvas changes and the problems show on the steps at once.
+ * The server stays the authority and checks everything again.
+ */
+export function validateFlow(graph: FlowGraph): import("@/types").FlowValidationError[] {
+  const errors: import("@/types").FlowValidationError[] = [];
+  const fail = (message: string, nodeId?: string) => errors.push(nodeId ? { nodeId, message } : { message });
+  const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const https = /^https:\/\/\S+$/i;
+
+  for (const n of graph.nodes) {
+    const d = n.data || {};
+    const id = n.id;
+    const titles = (list: FlowOption[] | undefined, kind: string, max: number) => {
+      for (const o of list || []) {
+        if (!s(o.title)) fail(`Every ${kind} needs a title`, id);
+        else if (s(o.title).length > max) fail(`${kind[0].toUpperCase()}${kind.slice(1)} "${s(o.title)}" is longer than ${max} characters`, id);
+      }
+    };
+    const badVariable = () => {
+      const v = s(d.variable);
+      if (v && !VARIABLE_RE.test(v)) fail(`"${v}" isn't a valid field name — use lowercase letters, numbers and _`, id);
+    };
+    switch (n.type) {
+      case "slot_picker":
+        fail("The Pick appointment step is no longer available — remove it from this flow.", id);
+        break;
+      case "trigger":
+        titles(d.buttons, "button", 1000);
+        break;
+      case "message": {
+        const buttons = d.buttons || [];
+        const media = d.mediaType && d.mediaType !== "NONE";
+        if (media && !https.test(s(d.mediaUrl))) fail("Media needs a public https:// link", id);
+        titles(buttons, "button", FLOW_LIMITS.buttonTitle);
+        if (buttons.length > FLOW_LIMITS.buttons) fail(`WhatsApp allows at most ${FLOW_LIMITS.buttons} buttons`, id);
+        if (d.link) {
+          if (buttons.length) fail("A link button can't be combined with reply buttons — use one or the other", id);
+          if (!s(d.link.title)) fail("The link button needs a title", id);
+          else if (s(d.link.title).length > FLOW_LIMITS.buttonTitle) fail(`Link button "${s(d.link.title)}" is longer than ${FLOW_LIMITS.buttonTitle} characters`, id);
+          if (!https.test(s(d.link.url))) fail("The link button needs a link starting with https://", id);
+        }
+        const interactive = buttons.length > 0 || !!d.link;
+        if ((!media || d.link) && !s(d.text)) fail("Message text is required", id);
+        const max = interactive ? FLOW_LIMITS.body : FLOW_LIMITS.text;
+        if (s(d.text).length > max) fail(`Text is ${s(d.text).length} characters — WhatsApp allows ${max}`, id);
+        if (interactive && s(d.footer).length > FLOW_LIMITS.footer) fail(`Footer is longer than ${FLOW_LIMITS.footer} characters`, id);
+        if (buttons.length) badVariable();
+        break;
+      }
+      case "list":
+        if (!s(d.text)) fail("Message text is required", id);
+        if (!s(d.buttonLabel)) fail("The list needs a button label (e.g. \"View options\")", id);
+        if (!(d.rows || []).length) fail("A list needs at least one option", id);
+        titles(d.rows, "option", FLOW_LIMITS.rowTitle);
+        badVariable();
+        break;
+      case "carousel":
+        if (!d.templateId) fail("Choose an approved carousel template", id);
+        break;
+      case "cards": {
+        if (!s(d.text)) fail("Message text is required", id);
+        const cards = d.cards || [];
+        if (cards.length < CARD_LIMITS.min || cards.length > CARD_LIMITS.max) fail(`Cards needs between ${CARD_LIMITS.min} and ${CARD_LIMITS.max} cards`, id);
+        cards.forEach((c, i) => {
+          if (!https.test(s(c.mediaUrl))) fail(`Card ${i + 1} needs its ${(c.mediaType || "IMAGE").toLowerCase()} (a public https:// link)`, id);
+          if (!c.buttons.length) fail(`Card ${i + 1} needs a button`, id);
+          for (const b of c.buttons) {
+            if (!s(b.title)) fail(`Card ${i + 1}: every button needs a title`, id);
+            if (b.type === "URL" && !/^https?:\/\//i.test(s(b.url))) fail(`Card ${i + 1}: "${s(b.title)}" needs a link starting with https://`, id);
+          }
+        });
+        badVariable();
+        break;
+      }
+      case "question":
+        if (!s(d.text)) fail("Message text is required", id);
+        if (!s(d.variable)) fail("Choose a field name to save the answer in (e.g. preferred_date)", id);
+        badVariable();
+        break;
+      case "tag":
+        if (!s(d.tag)) fail("Enter the tag to add", id);
+        break;
+    }
+  }
+
+  const start = graph.nodes.find((n) => n.type === "trigger");
+  if (!start) fail("A flow needs a Start step");
+  else if (!graph.edges.some((e) => e.source === start.id)) fail("Connect at least one Start output to a step", start.id);
+  return errors;
+}
+
 export const VARIABLE_RE = /^[a-z_][a-z0-9_]{0,39}$/;
 export const BUILT_IN_VARIABLES = ["first_name", "customer_name", "phone"];
