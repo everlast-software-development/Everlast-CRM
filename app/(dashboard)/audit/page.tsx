@@ -6,6 +6,7 @@ import { apiGetAuditLog } from "@/lib/api";
 import type { AuditLog } from "@/types";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { PageSpinner } from "@/components/ui/spinner";
+import { ErrorLogPanel } from "@/components/audit/ErrorLogPanel";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,6 +95,15 @@ export default function AuditLogPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [actionFilter, setActionFilter] = useState("");
+  // Activity = who did what; Errors = what went wrong (webhooks, deliveries…).
+  // /audit?tab=errors opens Errors (the sidebar badge links there).
+  const [tab, setTab] = useState<"activity" | "errors">("activity");
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (new URLSearchParams(window.location.search).get("tab") === "errors") setTab("errors");
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
   const [loadingMore, setLoadingMore] = useState(false);
 
   // Debounce ref for action filter
@@ -199,10 +209,29 @@ export default function AuditLogPage() {
   return (
     <div className="flex flex-col h-full bg-canvas-warm">
       {/* Page header */}
-      <div className="bg-white border-b border-gray-100 px-6 py-4 shrink-0">
+      <div className="bg-white border-b border-gray-100 px-6 py-4 shrink-0 flex items-center gap-4">
         <h1 className="text-[18px] font-bold text-gray-900">Audit Log</h1>
+        <div className="inline-flex bg-gray-50 border border-gray-100 rounded-lg p-1 gap-1">
+          {([
+            ["activity", "Activity"],
+            ["errors", "Errors"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTab(value)}
+              className={`text-[13px] font-semibold rounded-md px-3.5 py-1.5 transition-colors ${tab === value ? "bg-brand text-white" : "text-gray-500 hover:text-gray-800"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {tab === "errors" ? (
+        <ErrorLogPanel />
+      ) : (
+      <>
       {/* Filter bar */}
       <div className="px-6 pt-4 pb-2 shrink-0">
         <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 max-w-xs shadow-sm">
@@ -327,6 +356,8 @@ export default function AuditLogPage() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

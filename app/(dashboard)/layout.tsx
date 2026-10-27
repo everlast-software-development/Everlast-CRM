@@ -24,7 +24,7 @@ import {
   BookMarked,
 } from "lucide-react";
 import { getSocket, disconnectSocket } from "@/lib/socket";
-import { apiLogout, apiGetLineCounts, apiGetPendingApprovals } from "@/lib/api";
+import { apiLogout, apiGetLineCounts, apiGetPendingApprovals, apiGetErrorSummary } from "@/lib/api";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WhatsAppNumberProvider, useActiveNumber } from "@/components/WhatsAppNumberProvider";
 import { NumberSwitcher } from "@/components/NumberSwitcher";
@@ -141,6 +141,9 @@ function DashboardShell({ children }: { children: ReactNode }) {
   const [templateUpdates, setTemplateUpdates] = useState(0);
   // Campaigns waiting for an admin's approval, across every number.
   const [pendingApprovals, setPendingApprovals] = useState(0);
+  // Open errors seen in the last 24 hours (Audit Log → Errors), for admins.
+  const [recentErrors, setRecentErrors] = useState(0);
+  const readsAudit = can("audit:read");
   const canApprove = can("campaign:send");
   const [contactsOpen, setContactsOpen] = useState(pathname.startsWith("/customers"));
 
@@ -222,6 +225,18 @@ function DashboardShell({ children }: { children: ReactNode }) {
     };
   }, [canApprove]);
 
+  useEffect(() => {
+    if (!readsAudit) return;
+    const fetchErrors = () => {
+      apiGetErrorSummary()
+        .then((res) => setRecentErrors(res.data.recent))
+        .catch(() => {});
+    };
+    fetchErrors();
+    const timer = setInterval(fetchErrors, 60_000);
+    return () => clearInterval(timer);
+  }, [readsAudit, pathname]);
+
   // Auto-close on navigation
   useEffect(() => {
     startTransition(() => {
@@ -231,7 +246,8 @@ function DashboardShell({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   function isActive(href: string) {
-    return pathname === href || pathname.startsWith(href + "/");
+    const path = href.split("?")[0];
+    return pathname === path || pathname.startsWith(path + "/");
   }
 
   // Each link names the permission that opens its page, and is shown only to
@@ -262,7 +278,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
     { href: "/templates", icon: LayoutTemplate,  label: "Templates",     perm: "template:write" as const, badge: templateUpdates > 0 ? templateUpdates : undefined },
     { href: "/media-library", icon: Images,      label: "Media Library", perm: "media:write" as const },
     { href: "/number-health", icon: ShieldCheck, label: "Number Health", perm: "stats:read" as const },
-    { href: "/audit",     icon: ClipboardList,   label: "Audit Log",     perm: "audit:read" as const },
+    { href: recentErrors > 0 ? "/audit?tab=errors" : "/audit", icon: ClipboardList, label: "Audit Log", perm: "audit:read" as const, badge: recentErrors > 0 ? recentErrors : undefined },
     // Users, WhatsApp numbers, quiet hours, campaign safety, my account.
     // Admin only; Team & Access lives here now (/team redirects).
     { href: "/settings",  icon: Settings,        label: "Settings",      perm: "settings:write" as const },

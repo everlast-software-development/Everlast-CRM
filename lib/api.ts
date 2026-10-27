@@ -438,6 +438,35 @@ export function apiSearchMessages(
   return apiFetch<MessagesResponse>(`/api/messages/search?${params.toString()}`);
 }
 
+// ── Error log (admin) ──
+export type ErrorLogQuery = { source?: string; status?: "open" | "resolved" | "all"; q?: string; page?: number };
+
+export function apiGetErrorLog(query: ErrorLogQuery = {}) {
+  const params = new URLSearchParams({ page: String(query.page ?? 1), limit: "25", status: query.status ?? "open" });
+  if (query.source) params.set("source", query.source);
+  if (query.q) params.set("q", query.q);
+  // Not number-scoped: errors are workspace-wide.
+  return apiFetch<import("@/types").ErrorLogResponse>(`/api/audit/errors?${params.toString()}`, {}, { numberScoped: false });
+}
+
+/** Open errors seen in the last 24 hours — the sidebar badge. */
+export function apiGetErrorSummary() {
+  return apiFetch<{ success: boolean; data: { recent: number } }>("/api/audit/errors/summary", {}, { numberScoped: false });
+}
+
+export function apiSetErrorResolved(id: number, resolved: boolean) {
+  return apiFetch<{ success: boolean }>(`/api/audit/errors/${id}/${resolved ? "resolve" : "reopen"}`, { method: "POST" }, { numberScoped: false });
+}
+
+/** Resolves every open entry matching the filter (source / search). */
+export function apiResolveAllErrors(filter: { source?: string; q?: string }) {
+  return apiFetch<{ success: boolean; data: { count: number } }>(
+    "/api/audit/errors/resolve-all",
+    { method: "POST", body: JSON.stringify(filter) },
+    { numberScoped: false },
+  );
+}
+
 export function apiGetAuditLog(
   page = 1,
   limit = 20,

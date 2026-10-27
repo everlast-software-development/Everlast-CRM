@@ -174,6 +174,34 @@ export interface AuditLogResponse {
   };
 }
 
+// ─── Error log (GET /api/audit/errors) ─────────────────────────────────────
+export type ErrorSource = "webhook" | "delivery" | "send" | "flow" | "campaign" | "api" | "job" | "templates" | "number" | "system";
+
+export interface ErrorLogEntry {
+  id: number;
+  source: ErrorSource;
+  code: string | null;
+  message: string;
+  /** How many times it happened while open (repeats are grouped). */
+  count: number;
+  details: Record<string, unknown> | null;
+  conversationId: number | null;
+  campaignId: number | null;
+  flowRunId: number | null;
+  whatsappNumberId: number | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  resolvedAt: string | null;
+}
+
+export interface ErrorLogResponse {
+  success: boolean;
+  data: ErrorLogEntry[];
+  /** Open entries per source, for the filter chips. */
+  openBySource: Partial<Record<ErrorSource, number>>;
+  pagination: { total: number; page: number; limit: number; totalPages: number };
+}
+
 export type UserStatus = "ONLINE" | "OFFLINE" | "ON_BREAK";
 
 export interface StatsOverview {
