@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Lock } from "lucide-react";
+import { Copy, Eye, EyeOff, Lock, Wand2 } from "lucide-react";
 import {
   ApiError,
   apiGetUsers,
@@ -247,6 +247,95 @@ function UsernameTakenNote({ message }: { message: string | null }) {
 }
 const takenCls = "border-red-400 focus:border-red-400 focus:ring-red-100";
 
+// A strong password the admin can hand over: 14 characters with upper and
+// lower case, digits and a symbol, from the browser's secure random source.
+// Look-alikes (0/O, 1/l/I) are left out so it can be read out or typed.
+const PW_SETS = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "!@#$%&*?"];
+function generatePassword(length = 14): string {
+  const all = PW_SETS.join("");
+  const pick = (set: string) => set[crypto.getRandomValues(new Uint32Array(1))[0] % set.length];
+  const chars = PW_SETS.map(pick); // one of each kind
+  while (chars.length < length) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
+
+// Password input with Show/Hide, Generate and Copy. Generating reveals the
+// password so the admin can see what to pass on.
+function PasswordField({
+  value,
+  onChange,
+  onGenerate,
+  inputRef,
+  placeholder = "Min 8 characters",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  /** Called with a fresh password; defaults to onChange. */
+  onGenerate?: (pw: string) => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  placeholder?: string;
+}) {
+  const toast = useToast();
+  const [show, setShow] = useState(false);
+  const btn = "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-semibold transition-colors cursor-pointer";
+
+  async function copy() {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success("Password copied");
+    } catch {
+      toast.error("Couldn't copy — select it and copy by hand");
+    }
+  }
+
+  return (
+    <div>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={`${inputCls} pr-10 ${show ? "font-mono" : ""}`}
+          autoComplete="new-password"
+          spellCheck={false}
+        />
+        <button
+          type="button"
+          onClick={() => setShow((v) => !v)}
+          aria-label={show ? "Hide password" : "Show password"}
+          title={show ? "Hide" : "Show"}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+        >
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+      <div className="flex items-center gap-1.5 mt-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            const pw = generatePassword();
+            (onGenerate ?? onChange)(pw);
+            setShow(true);
+          }}
+          className={`${btn} text-brand-fg bg-brand-100 hover:bg-brand-200`}
+        >
+          <Wand2 className="w-3.5 h-3.5" /> Generate strong password
+        </button>
+        <button type="button" onClick={() => void copy()} disabled={!value} className={`${btn} text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed`}>
+          <Copy className="w-3.5 h-3.5" /> Copy
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface CreateDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -330,7 +419,7 @@ function CreateUserDrawer({ open, onClose, onCreated }: CreateDrawerProps) {
 
         <div>
           <label className={labelCls}>Password <span className="text-red-500">*</span></label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 8 characters" className={inputCls} autoComplete="new-password" />
+          <PasswordField value={password} onChange={setPassword} />
         </div>
 
         <div>
@@ -523,7 +612,13 @@ function ResetPasswordDrawer({ open, user, onClose, onReset }: ResetPasswordDraw
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className={labelCls}>New password <span className="text-red-500">*</span></label>
-          <input ref={inputRef} type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 8 characters" className={inputCls} autoComplete="new-password" />
+          {/* Generating fills the confirm box too, so it's one click. */}
+          <PasswordField
+            inputRef={inputRef}
+            value={newPassword}
+            onChange={setNewPassword}
+            onGenerate={(pw) => { setNewPassword(pw); setConfirmPassword(pw); }}
+          />
         </div>
 
         <div>
