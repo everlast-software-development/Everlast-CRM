@@ -10,7 +10,7 @@ const ROLE_PURPOSE = {
   ADMIN: "You run the workspace: you see everything, approve campaigns, manage the team, WhatsApp lines and settings.",
   SUPERVISOR: "You answer patients like an agent, and you also watch the whole team: who is waiting, response times and reports.",
   AGENT: "You answer patients on WhatsApp, set follow-ups when you need to get back to someone and keep your chats moving.",
-  MARKETING: "You build audiences, templates and campaigns. An admin approves each campaign before it is sent. You don't see patient chats.",
+  MARKETING: "You build audiences, templates and campaigns, and send or schedule them. You don't see patient chats.",
   DIRECTOR: "You follow how the clinic is doing: dashboards, reports, the team's performance and campaign results. Everything is read-only.",
 } as const;
 

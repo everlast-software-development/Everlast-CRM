@@ -28,7 +28,7 @@ const overview: DocPage = {
       <Steps
         items={[
           <><b>Draft</b>: being built. Only drafts can be edited.</>,
-          <><b>Awaiting approval</b>: submitted by marketing; recipients and flow are now frozen. An admin approves or rejects it. A
+          <><b>Awaiting approval</b>: submitted by someone who can't send; recipients and flow are now frozen. An admin or marketing approves or rejects it. A
             rejected campaign goes back to drafts marked <b>Sent back</b>, with the reason.</>,
           <><b>Scheduled</b>: approved for a later time. <b>Sending now</b>: messages are going out, with live progress.</>,
           <><b>Paused</b>: stopped by a person or by a safety rule (see <DocLink to="campaign-rules">Sending rules</DocLink>).</>,
@@ -112,8 +112,8 @@ const approval: DocPage = {
   body: (ctx) => (
     <>
       <Lead>
-        Marketing builds campaigns; <b>only an admin approves, rejects, sends or schedules them</b>. That way every campaign gets a
-        second look before it reaches patients.
+        Admins and marketing <b>send or schedule</b> campaigns directly. A campaign drafted by someone without that right is submitted
+        for approval instead, and an admin or marketing approves or rejects it.
       </Lead>
       {ctx.can("campaign:send") ? (
         <>
