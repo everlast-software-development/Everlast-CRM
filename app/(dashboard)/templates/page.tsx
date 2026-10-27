@@ -22,8 +22,7 @@ import {
   ApiError,
   apiSyncTemplates,
 } from "@/lib/api";
-import { HeaderPreview, ButtonRow, WaText } from "@/components/templates/shared";
-import { CarouselPreview } from "@/components/templates/CarouselEditor";
+import { WaChat, WaTemplateMessage } from "@/components/whatsapp/WaPreview";
 import ImportFromMetaModal, { SETUP_NEED_LABEL } from "@/components/templates/ImportFromMetaModal";
 import TemplateSetupModal from "@/components/templates/TemplateSetupModal";
 import type {
@@ -360,36 +359,18 @@ function TemplateCard({
         )}
       </div>
 
-      {/* Scrollable bubble area */}
-      <div className="mx-3 mb-3 flex-1 overflow-y-auto max-h-80 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-[#2f5840]/30 [&::-webkit-scrollbar-thumb]:rounded-full">
-        {/* Dark green WhatsApp bubble */}
-        <div className="bg-brand rounded-2xl rounded-br-sm px-3.5 py-3 shadow-sm">
-          <HeaderPreview headerType={template.headerType} header={template.header} headerMediaUrl={template.headerMediaUrl} />
-          <p className="text-[13px] text-white leading-relaxed whitespace-pre-wrap">
-            <WaText text={template.body} />
-          </p>
-          {template.footer && (
-            <p className="text-[11px] text-white/55 italic mt-2 leading-snug">
-              {template.footer}
-            </p>
-          )}
-          <div className="flex justify-end mt-2">
-            <span className="text-[10px] text-white/50">15:32 ✓✓</span>
-          </div>
-        </div>
-
-        {/* Carousel cards */}
-        {template.cards && template.cards.length > 0 && <CarouselPreview cards={template.cards} />}
-
-        {/* CTA buttons */}
-        {template.buttons && template.buttons.length > 0 && (
-          <div className="mt-1.5 space-y-1.5">
-            {template.buttons.map((btn) => (
-              <ButtonRow key={btn.id} btn={btn} />
-            ))}
-          </div>
-        )}
-      </div>
+      {/* The message as the customer's phone shows it */}
+      <WaChat className="mx-3 mb-3 flex-1 max-h-80 rounded-xl">
+        <WaTemplateMessage
+          headerType={template.headerType}
+          header={template.header}
+          headerMediaUrl={template.headerMediaUrl}
+          body={template.body}
+          footer={template.footer}
+          buttons={template.buttons ?? []}
+          cards={template.cards}
+        />
+      </WaChat>
 
       {/* Action footer */}
       <div className="shrink-0 flex items-stretch border-t border-gray-100 divide-x divide-gray-100 text-[12px] font-medium">

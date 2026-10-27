@@ -222,29 +222,3 @@ export function CarouselEditor({ cards, onChange }: { cards: TemplateCard[]; onC
     </div>
   );
 }
-
-/** Live-preview row of swipeable cards, for the template form. */
-export function CarouselPreview({ cards }: { cards: TemplateCard[] }) {
-  return (
-    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 snap-x">
-      {cards.map((c, i) => (
-        <div key={i} className="snap-start shrink-0 w-[170px] bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          {c.mediaUrl && c.mediaType === "IMAGE" ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={c.mediaUrl} alt="" className="w-full h-24 object-cover" />
-          ) : (
-            <div className="h-24 bg-gray-100 flex items-center justify-center text-[11px] text-gray-400">{c.mediaType === "VIDEO" ? "▶ Video" : "Image"}</div>
-          )}
-          <p className="px-2.5 pt-2 text-[12px] text-gray-800 whitespace-pre-wrap line-clamp-4 min-h-[2.5em]">{c.body || <span className="text-gray-300 italic">Card text</span>}</p>
-          <div className="p-1.5 space-y-1">
-            {c.buttons.map((b) => (
-              <div key={b.id} className="border border-gray-100 rounded-lg py-1.5 text-center text-[12px] font-medium text-brand-fg">
-                {b.type === "URL" ? "🔗 " : ""}{b.title || "Button"}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}

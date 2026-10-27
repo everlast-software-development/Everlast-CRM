@@ -1,8 +1,9 @@
-import { Type, Image as ImageIcon, Video, FileText, Ban, Link2, Phone, MessageSquareText, PlayCircle } from "lucide-react";
-import type { TemplateButton, TemplateButtonType, TemplateHeaderType } from "@/types";
+import { Type, Image as ImageIcon, Video, FileText, Ban, Link2, Phone, MessageSquareText } from "lucide-react";
+import type { TemplateButtonType, TemplateHeaderType } from "@/types";
 
-// Shared between the Templates list page (card grid preview) and the
-// Create/Edit Template page (form + live preview) so the two never drift.
+// Shared between the Templates list page and the Create/Edit Template page so
+// the two never drift. The message previews themselves are drawn by
+// components/whatsapp/WaPreview.
 
 export const LIMITS = { name: 512, header: 60, body: 800, footer: 60, button: 25 };
 
@@ -46,7 +47,7 @@ export function headerCharError(text: string): string | null {
 // publish the cut-off, so this is an estimate: lines as a phone wraps them
 // (about 38 characters a line), blank lines included. Tuned from real sends —
 // the Anniversary template (~18 lines) folded.
-const WA_CHARS_PER_LINE = 38;
+export const WA_CHARS_PER_LINE = 38;
 export const WA_FOLD_LINES = 10;
 export function estimateWaLines(text: string): number {
   return renderPreview(text)
@@ -92,59 +93,3 @@ export function CharCount({ val, max }: { val: string; max: number }) {
     </span>
   );
 }
-
-// Renders a template's header inside a WhatsApp-style bubble — text, image,
-// video, or document — shared by the card grid and the live preview.
-export function HeaderPreview({
-  headerType,
-  header,
-  headerMediaUrl,
-}: {
-  headerType: TemplateHeaderType;
-  header: string | null;
-  headerMediaUrl: string | null;
-}) {
-  if (headerType === "TEXT" && header?.trim()) {
-    return <p className="text-[13px] font-bold text-white mb-1.5 leading-snug">{renderPreview(header)}</p>;
-  }
-  if (headerType === "IMAGE" && headerMediaUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={headerMediaUrl}
-        alt=""
-        className="w-full max-h-40 object-cover rounded-lg mb-1.5 bg-black/10"
-        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-      />
-    );
-  }
-  if (headerType === "VIDEO" && headerMediaUrl) {
-    return (
-      <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2.5 py-3 mb-1.5">
-        <PlayCircle className="w-5 h-5 text-white shrink-0" />
-        <span className="text-[11px] text-white/80 truncate">Video attachment</span>
-      </div>
-    );
-  }
-  if (headerType === "DOCUMENT" && headerMediaUrl) {
-    return (
-      <div className="flex items-center gap-2 bg-black/20 rounded-lg px-2.5 py-3 mb-1.5">
-        <FileText className="w-5 h-5 text-white shrink-0" />
-        <span className="text-[11px] text-white/80 truncate">{headerMediaUrl.split("/").pop() || "Document"}</span>
-      </div>
-    );
-  }
-  return null;
-}
-
-export function ButtonRow({ btn }: { btn: TemplateButton }) {
-  const meta = BUTTON_TYPE_META[btn.type] ?? BUTTON_TYPE_META.QUICK_REPLY;
-  const Icon = meta.icon;
-  return (
-    <div className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 bg-white text-[12px] font-medium text-brand-fg">
-      {Icon && <Icon className="w-3.5 h-3.5" />}
-      {btn.title}
-    </div>
-  );
-}
-

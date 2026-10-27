@@ -5,7 +5,7 @@ import { RotateCcw, Send, X } from "lucide-react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import type { FlowGraph, FlowNode, FlowOption, Template } from "@/types";
 import { flowCardLabel } from "@/lib/flows";
-import { WaText } from "@/components/templates/shared";
+import { WaBubble, WaCarousel, WaChat, WaHeader, WaListMessage, WaOutgoing, WaSystemNote, type WaAction } from "@/components/whatsapp/WaPreview";
 
 // A dry run of the flow being edited — unsaved changes included. It walks the
 // graph with the same rules as the server's engine (utils/flowEngine.js) but
@@ -13,7 +13,7 @@ import { WaText } from "@/components/templates/shared";
 // every branch before a real campaign goes out.
 
 type Item =
-  | { kind: "bot"; nodeId?: string; text?: string; mediaType?: string; mediaUrl?: string; footer?: string; header?: string; buttons?: FlowOption[]; list?: { label: string; rows: FlowOption[] }; cards?: SimCard[] }
+  | { kind: "bot"; nodeId?: string; text?: string; mediaType?: string; mediaUrl?: string; footer?: string; header?: string; buttons?: FlowOption[]; link?: { title: string; url: string }; list?: { label: string; rows: FlowOption[] }; cards?: SimCard[] }
   | { kind: "user"; text: string }
   | { kind: "event"; text: string; tone?: "info" | "warn" | "end" };
 
@@ -142,7 +142,7 @@ export function FlowSimulator({
       const say = (t?: string) => interpolate(t, name, ans);
       switch (n.type) {
         case "message": {
-          out.push({ kind: "bot", nodeId: n.id, text: say(d.text), mediaType: d.mediaType, mediaUrl: d.mediaUrl, footer: d.footer, buttons: d.buttons });
+          out.push({ kind: "bot", nodeId: n.id, text: say(d.text), mediaType: d.mediaType, mediaUrl: d.mediaUrl, footer: d.footer, buttons: d.buttons, link: d.link });
           if (d.buttons && d.buttons.length) return { kind: "buttons", nodeId: n.id, options: d.buttons };
           id = next(n.id, "next");
           break;
@@ -326,20 +326,23 @@ export function FlowSimulator({
     waiting?.kind === "question" ? "Type the customer's answer…"
     : waiting?.kind === "start" ? "Or type a reply to the campaign…" : waiting ? "Waiting for a tap (typing goes to the inbox)" : "Flow finished — restart to try another path";
 
+  const headerBtn = "w-8 h-8 rounded-full flex items-center justify-center text-[#fff]/90 dark:text-[#aebac1] hover:bg-black/10 dark:hover:bg-[#fff]/10 cursor-pointer";
+
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-        <div className="min-w-0">
-          <p className="text-[14px] font-bold text-gray-900">Test this flow</p>
-          <p className="text-[11px] text-gray-400">Dry run — nothing is sent or saved</p>
-        </div>
-        <button type="button" onClick={restart} title="Start over" className="ml-auto w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50">
-          <RotateCcw className="w-4 h-4" />
-        </button>
-        <button type="button" onClick={onClose} title="Close test" className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+      <WaHeader
+        subtitle="Test run — nothing is sent or saved"
+        actions={
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button type="button" onClick={restart} title="Start over" className={headerBtn}>
+              <RotateCcw className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={onClose} title="Close test" className={headerBtn}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        }
+      />
 
       <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-2">
         <span className="text-[11px] text-gray-400 shrink-0">Test as</span>
@@ -347,124 +350,77 @@ export function FlowSimulator({
       </div>
 
       {/* Phone */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-2.5 bg-[#ECE5DD]">
-        {/* The campaign message that starts it all */}
-        <div className="max-w-[85%]">
-          <div className="bg-white rounded-xl rounded-tl-sm px-3 py-2 shadow-sm">
-            <p className="text-[11px] font-semibold text-brand-fg mb-0.5">Campaign message</p>
-            <p className="text-[13px] text-gray-500 italic">Your campaign template{startButtons.length ? " with its buttons" : ""}</p>
-          </div>
-          {startButtons.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              disabled={waiting?.kind !== "start"}
-              onClick={() => tapStart(b)}
-              className="mt-1 w-full bg-white rounded-xl py-2 text-[13px] font-medium text-brand-fg shadow-sm enabled:hover:bg-brand-50 disabled:opacity-50"
-            >
-              {b.title || "Button"}
-            </button>
-          ))}
+      <WaChat scrollRef={scrollRef} className="flex-1">
+        <div className="space-y-1.5">
+          {/* The campaign message that starts it all */}
+          <WaBubble
+            title="Campaign message"
+            placeholder={`Your campaign template${startButtons.length ? " with its buttons" : ""}`}
+            actions={startButtons.map((b) => ({ key: b.id, kind: "reply", label: b.title, onClick: () => tapStart(b), disabled: waiting?.kind !== "start" }))}
+          />
           {startButtons.length === 0 && (
-            <p className="text-[11px] text-amber-700 mt-1">Add the template&apos;s buttons to the Start step to test them.</p>
+            <WaSystemNote tone="warn">Add the template&apos;s buttons to the Start step to test them.</WaSystemNote>
           )}
-        </div>
 
-        {items.map((it, i) => {
-          if (it.kind === "user") {
+          {items.map((it, i) => {
+            // Only the first bubble in a run from the same side gets a tail.
+            const prev = i === 0 ? null : items[i - 1];
+            if (it.kind === "user") {
+              return <div key={i} className="pt-1"><WaOutgoing text={it.text} tail={prev?.kind !== "user"} /></div>;
+            }
+            if (it.kind === "event") {
+              return <div key={i} className="py-1"><WaSystemNote tone={it.tone}>{it.text}</WaSystemNote></div>;
+            }
+            const nodeId = it.nodeId || "";
+            const tail = prev?.kind !== "bot";
+            if (it.list) {
+              return (
+                <div key={i} className="pt-1">
+                  <WaListMessage
+                    tail={tail}
+                    title={it.header}
+                    text={it.text || undefined}
+                    footer={it.footer}
+                    label={it.list.label}
+                    rows={it.list.rows.map((r) => ({ key: r.id, title: r.title, description: r.description, onSelect: () => choose(r, nodeId), disabled: handedOff }))}
+                  />
+                </div>
+              );
+            }
+            const actions: WaAction[] = (it.buttons || []).map((b) => ({ key: b.id, kind: "reply", label: b.title, onClick: () => choose(b, nodeId), disabled: handedOff }));
+            if (it.link) actions.push({ key: "__link", kind: "url", label: it.link.title || "Link", href: it.link.url || undefined });
+            const hasMedia = !!it.mediaType && it.mediaType !== "NONE";
             return (
-              <div key={i} className="flex justify-end">
-                <div className="max-w-[80%] bg-[#DCF8C6] rounded-xl rounded-tr-sm px-3 py-2 text-[13px] text-gray-800 shadow-sm whitespace-pre-wrap">{it.text}</div>
-              </div>
-            );
-          }
-          if (it.kind === "event") {
-            const cls = it.tone === "warn" ? "bg-amber-50 text-amber-800 border-amber-200" : it.tone === "end" ? "bg-gray-800 text-white dark:text-gray-50 border-gray-800" : "bg-white/70 text-gray-600 border-white";
-            return (
-              <div key={i} className="flex justify-center">
-                <span className={`text-[11px] rounded-lg border px-2.5 py-1 text-center max-w-[90%] ${cls}`}>{it.text}</span>
-              </div>
-            );
-          }
-          const nodeId = it.nodeId || "";
-          return (
-            <div key={i} className="max-w-[85%]">
-              <div className="bg-white rounded-xl rounded-tl-sm px-3 py-2 shadow-sm">
-                {it.mediaType && it.mediaType !== "NONE" && (
-                  it.mediaType === "IMAGE" && it.mediaUrl
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={it.mediaUrl} alt="" className="w-full max-h-40 object-cover rounded-lg mb-1.5" />
-                    : <div className="bg-gray-100 rounded-lg px-2 py-3 mb-1.5 text-[12px] text-gray-500">{it.mediaType === "VIDEO" ? "▶ Video" : "📄 Document"}</div>
+              <div key={i} className="pt-1 space-y-1.5">
+                {(it.text || it.header || it.footer || hasMedia || actions.length > 0) && (
+                  <WaBubble
+                    tail={tail}
+                    media={hasMedia ? { type: it.mediaType, url: it.mediaUrl } : undefined}
+                    title={it.header}
+                    text={it.text || undefined}
+                    footer={it.footer}
+                    actions={actions}
+                  />
                 )}
-                {it.header && <p className="text-[13px] font-bold text-gray-900 mb-0.5">{it.header}</p>}
-                {it.text ? <p className="text-[13px] text-gray-800 whitespace-pre-wrap break-words"><WaText text={it.text} /></p> : null}
-                {it.footer && <p className="text-[11px] text-gray-400 mt-1">{it.footer}</p>}
+                {it.cards && (
+                  <WaCarousel
+                    cards={it.cards.map((c, ci) => ({
+                      key: String(ci),
+                      mediaType: c.mediaType,
+                      mediaUrl: c.mediaUrl,
+                      body: c.body || c.label,
+                      actions: [
+                        ...c.taps.map((b): WaAction => ({ key: b.id, kind: "reply", label: b.title, onClick: () => chooseCard(b, c.label, nodeId), disabled: handedOff })),
+                        ...c.links.map((l, li): WaAction => ({ key: `link${li}`, kind: "url", label: l.title, href: l.url })),
+                      ],
+                    }))}
+                  />
+                )}
               </div>
-              {it.buttons?.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  disabled={handedOff}
-                  onClick={() => choose(b, nodeId)}
-                  className="mt-1 w-full bg-white rounded-xl py-2 text-[13px] font-medium text-brand-fg shadow-sm enabled:hover:bg-brand-50 disabled:opacity-50"
-                >
-                  {b.title || "Button"}
-                </button>
-              ))}
-              {it.cards && (
-                <div className="mt-1 -mx-1 flex gap-2 overflow-x-auto pb-1 snap-x">
-                  {it.cards.map((c, ci) => (
-                    <div key={ci} className="snap-start shrink-0 w-[180px] bg-white rounded-xl shadow-sm overflow-hidden">
-                      {c.mediaType === "VIDEO"
-                        ? <div className="h-24 bg-gray-100 flex items-center justify-center text-[12px] text-gray-500">▶ Video</div>
-                        : c.mediaUrl
-                          // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={c.mediaUrl} alt="" className="w-full h-24 object-cover" />
-                          : <div className="h-24 bg-gray-100" />}
-                      <p className="px-2.5 pt-2 text-[12px] text-gray-800 whitespace-pre-wrap line-clamp-4"><WaText text={c.body || c.label} /></p>
-                      <div className="p-1.5 space-y-1">
-                        {c.taps.map((b) => (
-                          <button
-                            key={b.id}
-                            type="button"
-                            disabled={handedOff}
-                            onClick={() => chooseCard(b, c.label, nodeId)}
-                            className="w-full border border-gray-100 rounded-lg py-1.5 text-[12px] font-medium text-brand-fg enabled:hover:bg-brand-50 disabled:opacity-50"
-                          >
-                            {b.title}
-                          </button>
-                        ))}
-                        {c.links.map((l, li) => (
-                          <a key={li} href={l.url} target="_blank" rel="noreferrer" className="block w-full border border-gray-100 rounded-lg py-1.5 text-center text-[12px] font-medium text-brand-fg hover:bg-brand-50">
-                            🔗 {l.title}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {it.list && (
-                <div className="mt-1 bg-white rounded-xl shadow-sm overflow-hidden">
-                  <p className="py-2 text-center text-[13px] font-medium text-brand-fg border-b border-gray-100">☰ {it.list.label}</p>
-                  {it.list.rows.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      disabled={handedOff}
-                      onClick={() => choose(r, nodeId)}
-                      className="w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 enabled:hover:bg-brand-50 disabled:opacity-50"
-                    >
-                      <span className="block text-[13px] text-gray-800">{r.title || "Option"}</span>
-                      {r.description && <span className="block text-[11px] text-gray-400">{r.description}</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </WaChat>
 
       {Object.keys(answers).length > 0 && (
         <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
@@ -479,17 +435,17 @@ export function FlowSimulator({
 
       <form
         onSubmit={(e) => { e.preventDefault(); sendText(); }}
-        className="flex items-center gap-2 px-3 py-2.5 border-t border-gray-100"
+        className="flex items-center gap-2 px-2.5 py-2 bg-[#eff2f5] dark:bg-[#202c33]"
       >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={!waiting}
           placeholder={placeholder}
-          className={`flex-1 text-[13px] border rounded-full px-3.5 py-2 focus:outline-none focus:border-brand disabled:bg-gray-50 ${canType ? "border-gray-200" : "border-gray-100"}`}
+          className={`flex-1 min-w-0 text-[14px] rounded-full px-4 py-2.5 bg-[#fff] dark:bg-[#2a3942] text-[#111b21] dark:text-[#e9edef] placeholder:text-[#8696a0] focus:outline-none disabled:opacity-60 ${canType ? "" : "italic"}`}
         />
-        <button type="submit" disabled={!waiting || !input.trim()} className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center disabled:opacity-40">
-          <Send className="w-4 h-4" />
+        <button type="submit" disabled={!waiting || !input.trim()} title="Send" className="w-10 h-10 shrink-0 rounded-full bg-[#00a884] text-[#fff] flex items-center justify-center disabled:opacity-40 cursor-pointer">
+          <Send className="w-[18px] h-[18px]" />
         </button>
       </form>
     </div>

@@ -30,13 +30,11 @@ import {
   renderPreview,
   estimateWaLines,
   WA_FOLD_LINES,
-  WaText,
   CharCount,
-  HeaderPreview,
-  ButtonRow,
 } from "./shared";
 import { usePlaceholderAutocomplete } from "./usePlaceholderAutocomplete";
-import { CarouselEditor, CarouselPreview, carouselError, newCard } from "./CarouselEditor";
+import { CarouselEditor, carouselError, newCard } from "./CarouselEditor";
+import { WaPhone, WaTemplateMessage } from "@/components/whatsapp/WaPreview";
 import type {
   Template,
   TemplateButton,
@@ -835,61 +833,19 @@ export default function TemplateForm({
             Live Preview
           </p>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {/* Simulated chat header */}
-            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100 bg-gray-50/80">
-              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-semibold text-[11px] shrink-0">
-                C
-              </div>
-              <div>
-                <p className="text-[12px] font-semibold text-gray-800 leading-tight">
-                  Customer
-                </p>
-                <p className="text-[10px] text-gray-400 leading-tight">
-                  +971 50 000 0000
-                </p>
-              </div>
-            </div>
-
-            {/* Chat body */}
-            <div className="px-3 py-4 bg-[#f0ece4]/40">
-              <div className="flex justify-end">
-                <div dir={dir} className="bg-brand rounded-2xl rounded-br-sm px-3.5 py-3 max-w-[95%] shadow-sm">
-                  {!isCarousel && <HeaderPreview headerType={headerType} header={header} headerMediaUrl={headerMediaUrl} />}
-                  <p className="text-[13px] text-white leading-relaxed whitespace-pre-wrap">
-                    {body.trim() ? (
-                      <WaText text={renderPreview(body)} />
-                    ) : (
-                      <span className="text-white/40 italic text-[12px]">
-                        Your message will appear here…
-                      </span>
-                    )}
-                  </p>
-                  {!isCarousel && footer.trim() && (
-                    <p className="text-[11px] text-white/55 mt-2 italic leading-snug">
-                      {renderPreview(footer)}
-                    </p>
-                  )}
-                  <div className="flex justify-end mt-1.5">
-                    <span className="text-[10px] text-white/50">
-                      15:32 ✓✓
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {isCarousel && <CarouselPreview cards={cards} />}
-
-              {/* Buttons preview */}
-              {!isCarousel && visibleButtons.length > 0 && (
-                <div className="mt-2 space-y-1.5">
-                  {visibleButtons.map((btn) => (
-                    <ButtonRow key={btn.id} btn={btn} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* As the customer's phone shows it — the template arrives on the left. */}
+          <WaPhone chatClassName="min-h-[380px]">
+            <WaTemplateMessage
+              headerType={isCarousel ? "NONE" : headerType}
+              header={renderPreview(header)}
+              headerMediaUrl={headerMediaUrl}
+              body={renderPreview(body)}
+              placeholder="Your message will appear here…"
+              footer={isCarousel ? null : renderPreview(footer)}
+              buttons={isCarousel ? [] : visibleButtons}
+              cards={isCarousel ? cards : null}
+            />
+          </WaPhone>
 
           {/* "Read more" warning — an estimate, see estimateWaLines */}
           {!isCarousel && body.trim() && estimateWaLines(body) > WA_FOLD_LINES && (
