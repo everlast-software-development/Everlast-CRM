@@ -32,7 +32,7 @@ const templates: DocPage = {
           <>Write the <b>Body</b> (up to 800 characters). Use <Ui>Personalize ▾</Ui> or type <Code>{"{{"}</Code> to insert{" "}
             <Code>{"{{first_name}}"}</Code>, <Code>{"{{customer_name}}"}</Code> or <Code>{"{{agent_name}}"}</Code>.</>,
           <>Optionally add a <b>Footer</b> (up to 60 characters). Tick <Ui>Add opt-out notice to footer</Ui> for &ldquo;Reply STOP to opt out&rdquo;.</>,
-          <>Optionally add <b>Buttons</b>: up to 3 Quick Replies, <i>or</i> up to 2 links plus 1 call button.</>,
+          <>Optionally add up to 10 <b>Buttons</b>, mixed freely: Quick Replies (up to 10), links (2), a call button (1) and a <b>Copy code</b> button (1, Campaign and Re-engagement only) that copies an offer code. Quick Replies stay together; use the arrows to reorder. With more than 3, WhatsApp shows 2 and puts the rest under &ldquo;See all options&rdquo;. A link can end with the patient&apos;s name, filled in for each patient.</>,
           <>Click <Ui>Create Template</Ui>. It&apos;s saved as a <b>Draft</b>. Click <Ui>Submit</Ui> to send it to Meta.</>,
         ]}
       />
@@ -73,12 +73,13 @@ const media: DocPage = {
   body: () => (
     <>
       <Who roles={rolesWith("media:write")} />
-      <Lead>The media library stores images, videos and documents to reuse, mainly as template headers.</Lead>
+      <Lead>The media library stores images, videos and documents to reuse: template headers, flow messages and cards, and campaign images.</Lead>
       <Shot name="media-library" alt="The Media Library" />
       <Bullets
         items={[
           <><Ui>Upload Media</Ui>: images (JPEG, PNG, GIF, WebP), video (MP4, 3GPP), audio (AAC, MP3, OGG, Opus, AMR) and documents
             (PDF, Word, Excel), up to <b>16 MB</b>.</>,
+          <>Wherever you choose a file (templates, flows, campaigns), you can also <b>drag it in</b>, <b>paste</b> a copied image (Ctrl+V), or paste a <b>link to an image on any website</b> and click <Ui>Import</Ui>. Every file added this way is saved here too. Imported links are copied, so they keep working if the other site changes.</>,
           <>Filter by type, rename a file, <Ui>Copy URL</Ui>, or open its details (type, size, dimensions, upload date).</>,
           <>Deleting a file that templates use shows how many. Those templates keep showing it until they&apos;re edited.</>,
         ]}

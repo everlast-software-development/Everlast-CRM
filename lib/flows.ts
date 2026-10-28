@@ -240,7 +240,7 @@ export function validateFlow(graph: FlowGraph): import("@/types").FlowValidation
       case "message": {
         const buttons = d.buttons || [];
         const media = d.mediaType && d.mediaType !== "NONE";
-        if (media && !https.test(s(d.mediaUrl))) fail("Media needs a public https:// link", id);
+        if (media && !https.test(s(d.mediaUrl))) fail(`Add the ${s(d.mediaType).toLowerCase()} — choose, upload or import it`, id);
         titles(buttons, "button", FLOW_LIMITS.buttonTitle);
         if (buttons.length > FLOW_LIMITS.buttons) fail(`WhatsApp allows at most ${FLOW_LIMITS.buttons} buttons`, id);
         if (d.link) {
@@ -272,7 +272,7 @@ export function validateFlow(graph: FlowGraph): import("@/types").FlowValidation
         const cards = d.cards || [];
         if (cards.length < CARD_LIMITS.min || cards.length > CARD_LIMITS.max) fail(`Cards needs between ${CARD_LIMITS.min} and ${CARD_LIMITS.max} cards`, id);
         cards.forEach((c, i) => {
-          if (!https.test(s(c.mediaUrl))) fail(`Card ${i + 1} needs its ${(c.mediaType || "IMAGE").toLowerCase()} (a public https:// link)`, id);
+          if (!https.test(s(c.mediaUrl))) fail(`Card ${i + 1} needs its ${(c.mediaType || "IMAGE").toLowerCase()} — choose, upload or import it`, id);
           if (!c.buttons.length) fail(`Card ${i + 1} needs a button`, id);
           for (const b of c.buttons) {
             if (!s(b.title)) fail(`Card ${i + 1}: every button needs a title`, id);

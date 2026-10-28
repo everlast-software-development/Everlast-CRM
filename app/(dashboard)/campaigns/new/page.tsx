@@ -35,6 +35,7 @@ import { CAMPAIGN_CATEGORIES, CAMPAIGN_CATEGORY_COLORS } from "@/lib/campaignCat
 import { FlowPicker } from "@/components/flows/FlowPicker";
 import { LIMITS } from "@/components/templates/shared";
 import { WaPhone, WaTemplateMessage } from "@/components/whatsapp/WaPreview";
+import MediaField from "@/components/MediaField";
 import { OverLimitDialog, overLimitDetails } from "@/components/CampaignApprovalDialogs";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -160,6 +161,16 @@ function StepDot({
 
 // ── WhatsApp Preview Bubble ───────────────────────────────────────────────────
 
+// A campaign may send its own file in place of its template's media header
+// (Meta approves the header's type, not the file).
+const MEDIA_HEADERS = ["IMAGE", "VIDEO", "DOCUMENT"] as const;
+type MediaHeader = (typeof MEDIA_HEADERS)[number];
+const mediaHeaderOf = (t: Template | null): MediaHeader | null =>
+  t && (MEDIA_HEADERS as readonly string[]).includes(t.headerType ?? "") ? (t.headerType as MediaHeader) : null;
+// The template as this campaign sends it.
+const withCampaignMedia = (t: Template, media: string | null): Template =>
+  media && mediaHeaderOf(t) ? { ...t, headerMediaUrl: media } : t;
+
 // The same WhatsApp pieces as the template editor's preview, on the
 // customer's phone, so what you pick here looks like what they receive.
 function WaBubble({ template, sampleName }: { template: Template; sampleName: string }) {
@@ -184,11 +195,16 @@ function Step1({
   selected,
   onSelect,
   sampleName,
+  media,
+  onMediaChange,
 }: {
   selected: Template | null;
   onSelect: (t: Template) => void;
   sampleName: string;
+  media: string | null;
+  onMediaChange: (url: string | null) => void;
 }) {
+  const selectedMedia = mediaHeaderOf(selected);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -271,8 +287,25 @@ function Step1({
         {selected ? (
           <>
             <div className="self-start w-full flex justify-center">
-              <WaBubble template={selected} sampleName={sampleName} />
+              <WaBubble template={withCampaignMedia(selected, media)} sampleName={sampleName} />
             </div>
+            {selectedMedia && (
+              <div className="self-stretch mt-4 bg-white rounded-xl p-3 border border-gray-100">
+                <p className="text-[12px] font-semibold text-gray-700">
+                  {selectedMedia === "IMAGE" ? "Image" : selectedMedia === "VIDEO" ? "Video" : "Document"} for this campaign
+                </p>
+                <p className="text-[11px] text-gray-400 mb-2">
+                  Send this campaign&apos;s own offer {selectedMedia.toLowerCase()} — no new Meta approval needed. It must stay {selectedMedia === "IMAGE" ? "an image" : "a " + selectedMedia.toLowerCase()}.
+                </p>
+                <MediaField
+                  key={selected.id}
+                  mediaType={selectedMedia}
+                  value={media}
+                  onChange={onMediaChange}
+                  fallbackUrl={selected.headerMediaUrl}
+                />
+              </div>
+            )}
             <p className="self-start text-[11px] text-gray-400 mt-3">
               Renders for: {sampleName || "Sample Customer"}
             </p>
@@ -800,7 +833,7 @@ function TestSendBox({ template }: { template: Template }) {
     setResult(null);
     try {
       // Stored as digits; the "+" makes the country code unambiguous.
-      const res = await apiTestSendTemplate(template.id, `+${phone.trim()}`);
+      const res = await apiTestSendTemplate(template.id, `+${phone.trim()}`, mediaHeaderOf(template) ? template.headerMediaUrl : null);
       setResult({
         ok: true,
         to: res.data.to,
@@ -1351,6 +1384,12 @@ function NewCampaignContent() {
 
   const [step, setStep] = useState(1);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  // This campaign's own header file; null = the template's.
+  const [campaignMedia, setCampaignMedia] = useState<string | null>(null);
+  const chooseTemplate = (t: Template) => {
+    if (t.id !== selectedTemplate?.id) setCampaignMedia(null);
+    setSelectedTemplate(t);
+  };
   // Recipients can be pre-seeded from the Customers page via ?recipients=1,2,3.
   // The draft flow (?draft=ID) owns selection itself, so it takes precedence.
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => {
@@ -1449,6 +1488,7 @@ function NewCampaignContent() {
         setRejectionReason(c.rejectionReason ?? null);
         if (c.template) {
           setSelectedTemplate(c.template as unknown as Template);
+          setCampaignMedia(c.headerMediaUrl ?? null);
         }
         // The lists a saved draft was picked from (its audience snapshot).
         const snap = (c as { audienceSnapshot?: { source?: string; lists?: { id: number }[] } | null }).audienceSnapshot;
@@ -1629,6 +1669,7 @@ function NewCampaignContent() {
             templateId: selectedTemplate.id,
             segmentId: segmentAudience.id,
             flowId,
+            headerMediaUrl: campaignMedia,
             ...(category && { category }),
           }
         : {
@@ -1637,6 +1678,7 @@ function NewCampaignContent() {
             recipientIds: [...selectedIds],
             audienceLists: audienceListIds(),
             flowId,
+            headerMediaUrl: campaignMedia,
             ...(category && { category }),
           };
       if (draftCampaignId) {
@@ -1660,8 +1702,8 @@ function NewCampaignContent() {
     try {
       const baseName = campaignName || `${selectedTemplate.name} · ${new Date().toLocaleDateString()}`;
       const payload = segmentAudience
-        ? { name: baseName, templateId: selectedTemplate.id, segmentId: segmentAudience.id, scheduledAt, flowId, ...(category && { category }) }
-        : { name: baseName, templateId: selectedTemplate.id, recipientIds: [...selectedIds], audienceLists: audienceListIds(), scheduledAt, flowId, ...(category && { category }) };
+        ? { name: baseName, templateId: selectedTemplate.id, segmentId: segmentAudience.id, scheduledAt, flowId, headerMediaUrl: campaignMedia, ...(category && { category }) }
+        : { name: baseName, templateId: selectedTemplate.id, recipientIds: [...selectedIds], audienceLists: audienceListIds(), scheduledAt, flowId, headerMediaUrl: campaignMedia, ...(category && { category }) };
       let campaignId: number;
       if (draftCampaignId) {
         // null, not undefined: switching back to "now" has to clear a time
@@ -1786,8 +1828,10 @@ function NewCampaignContent() {
             {step === 1 && (
               <Step1
                 selected={selectedTemplate}
-                onSelect={setSelectedTemplate}
+                onSelect={chooseTemplate}
                 sampleName={sampleName}
+                media={campaignMedia}
+                onMediaChange={setCampaignMedia}
               />
             )}
             {step === 2 && (
@@ -1810,7 +1854,7 @@ function NewCampaignContent() {
             )}
             {step === 3 && selectedTemplate && (
               <Step3
-                template={selectedTemplate}
+                template={withCampaignMedia(selectedTemplate, campaignMedia)}
                 segmentAudience={segmentAudience}
                 selectedIds={selectedIds}
                 customers={customers}

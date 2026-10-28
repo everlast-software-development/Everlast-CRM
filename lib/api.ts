@@ -310,6 +310,14 @@ export function apiUploadToMediaLibrary(file: File, name?: string) {
   return apiFetch<import("@/types").MediaAssetResponse>("/api/media-library", { method: "POST", body: form });
 }
 
+// Copies a file from a public link (any website) into the Media Library.
+export function apiImportMediaFromUrl(url: string, name?: string) {
+  return apiFetch<import("@/types").MediaAssetResponse>("/api/media-library/import", {
+    method: "POST",
+    body: JSON.stringify({ url, ...(name && { name }) }),
+  });
+}
+
 export function apiUpdateMediaAsset(id: number, data: { filename: string }) {
   return apiFetch<import("@/types").MediaAssetResponse>(`/api/media-library/${id}`, {
     method: "PUT",
@@ -887,7 +895,8 @@ export function apiGetTestPhones() {
   return apiFetch<{ success: boolean; data: string[] }>("/api/campaigns/test-phones");
 }
 
-export function apiTestSendTemplate(templateId: number, phone: string) {
+// headerMediaUrl: the campaign's own header file, so the test matches the send.
+export function apiTestSendTemplate(templateId: number, phone: string, headerMediaUrl?: string | null) {
   return apiFetch<{
     success: boolean;
     data: {
@@ -899,7 +908,7 @@ export function apiTestSendTemplate(templateId: number, phone: string) {
     };
   }>("/api/campaigns/test-send", {
     method: "POST",
-    body: JSON.stringify({ templateId, phone }),
+    body: JSON.stringify({ templateId, phone, ...(headerMediaUrl && { headerMediaUrl }) }),
   });
 }
 

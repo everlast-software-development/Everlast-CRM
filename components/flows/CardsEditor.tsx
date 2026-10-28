@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Image as ImageIcon, Plus, Trash2, Upload, Video, X } from "lucide-react";
-import { apiUploadToMediaLibrary } from "@/lib/api";
-import MediaPicker, { ACCEPT_BY_TYPE } from "@/components/MediaPicker";
-import type { FlowCard, MediaAsset } from "@/types";
+import { useState } from "react";
+import { ChevronDown, ChevronUp, Image as ImageIcon, Plus, Trash2, Video } from "lucide-react";
+import MediaField from "@/components/MediaField";
+import type { FlowCard } from "@/types";
 import { CARD_LIMITS, flowCardLabel, newFlowCard } from "@/lib/flows";
 import { FormatTextarea } from "./FormatTextarea";
 
@@ -50,11 +49,6 @@ type CardsUpdate = (prev: FlowCard[]) => FlowCard[];
 export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: (update: CardsUpdate) => void }) {
   const layout = layoutOf(cards);
   const [open, setOpen] = useState<number | null>(0);
-  const [pickerFor, setPickerFor] = useState<number | null>(null);
-  const [uploadingFor, setUploadingFor] = useState<number | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const uploadTarget = useRef<string | number | null>(null);
 
   // Cards are addressed by id (falling back to position for cards saved
   // without one), so a late update still lands on the right card after a reorder.
@@ -74,22 +68,6 @@ export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: 
     });
     setOpen(i + d);
   };
-
-  async function upload(file: File | undefined) {
-    const key = uploadTarget.current;
-    if (!file || key === null) return;
-    const i = cards.findIndex((c, j) => keyOf(c, j) === key);
-    setUploadingFor(i);
-    setUploadError(null);
-    try {
-      const res = await apiUploadToMediaLibrary(file, file.name);
-      updateCard(key, (c) => ({ ...c, mediaUrl: res.data.url, mediaType: file.type.startsWith("video") ? "VIDEO" : "IMAGE" }));
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploadingFor(null);
-    }
-  }
 
   return (
     <div className="space-y-3">
@@ -126,24 +104,11 @@ export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: 
 
             {isOpen && (
               <div className="p-2.5 space-y-2.5 border-t border-gray-100">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <button type="button" onClick={() => setPickerFor(i)} className="flex items-center gap-1 text-[12px] font-semibold text-brand-fg border border-brand/30 bg-brand-100 px-2.5 py-1.5 rounded-lg hover:bg-brand-200">
-                    <ImageIcon className="w-3.5 h-3.5" /> Library
-                  </button>
-                  <button
-                    type="button"
-                    disabled={uploadingFor !== null}
-                    onClick={() => { uploadTarget.current = keyOf(c, i); fileRef.current?.click(); }}
-                    className="flex items-center gap-1 text-[12px] font-semibold text-gray-600 border border-gray-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-60"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> {uploadingFor === i ? "Uploading…" : "Upload"}
-                  </button>
-                  {c.mediaUrl && (
-                    <button type="button" onClick={() => update(i, { mediaUrl: "" })} className="flex items-center gap-1 text-[12px] text-gray-400 hover:text-red-500 px-1">
-                      <X className="w-3.5 h-3.5" /> Remove image
-                    </button>
-                  )}
-                </div>
+                <MediaField
+                  mediaType={c.mediaType === "VIDEO" ? "VIDEO" : "IMAGE"}
+                  value={c.mediaUrl || null}
+                  onChange={(url) => update(i, { mediaUrl: url ?? "" })}
+                />
 
                 <div>
                   <FormatTextarea
@@ -208,22 +173,6 @@ export function CardsEditor({ cards, onChange }: { cards: FlowCard[]; onChange: 
         >
           <Plus className="w-3.5 h-3.5" /> Add card ({cards.length}/{CARD_LIMITS.max})
         </button>
-      )}
-      {uploadError && <p className="text-[12px] text-red-600">{uploadError}</p>}
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept={`${ACCEPT_BY_TYPE.IMAGE},${ACCEPT_BY_TYPE.VIDEO}`}
-        className="hidden"
-        onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ""; }}
-      />
-      {pickerFor !== null && (
-        <MediaPicker
-          mediaType="IMAGE"
-          onCancel={() => setPickerFor(null)}
-          onSelect={(asset: MediaAsset) => { update(pickerFor, { mediaUrl: asset.url, mediaType: "IMAGE" }); setPickerFor(null); }}
-        />
       )}
     </div>
   );

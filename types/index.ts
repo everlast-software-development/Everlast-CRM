@@ -423,6 +423,8 @@ export interface Campaign {
   name: string;
   templateId: number;
   template?: Pick<Template, "id" | "name" | "category" | "body" | "header" | "footer" | "buttons">;
+  // The campaign's own header file, sent instead of the template's (null = the template's).
+  headerMediaUrl?: string | null;
   category: CampaignCategory;
   status: CampaignStatus;
   pauseReason?: CampaignPauseReason | null;

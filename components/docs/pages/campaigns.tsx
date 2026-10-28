@@ -74,7 +74,8 @@ const creating: DocPage = {
       <Steps
         items={[
           <><b>Choose a template.</b> Only <b>approved</b> templates in the <b>Campaign</b> category are listed. Check the live preview,
-            then <Ui>Continue → Recipients</Ui>.</>,
+            then <Ui>Continue → Recipients</Ui>. If the template has an image (or video, or document) header, you can give this
+            campaign <b>its own image</b> under the preview, with no new Meta approval. It has to stay the same kind (an image stays an image).</>,
           <><b>Select recipients</b> from the <Ui>Contacts</Ui>, <Ui>Lists</Ui> or <Ui>Segments</Ui> tab. The side panel estimates
             send time and cost, and warns if you&apos;d go over the line&apos;s daily messaging limit. Opted-out contacts are counted
             and skipped automatically. Then <Ui>Review →</Ui>.</>,
@@ -266,7 +267,7 @@ const flows: DocPage = {
       <Who roles={rolesWith("campaign:write")} />
       <Lead>
         A <b>flow</b> answers patients who tap a campaign&apos;s buttons. It can send information, ask questions, tag the patient and
-        hand them to the team. Open <b>Campaigns → Flows</b>.
+        hand them to the team. Open <b>Flows</b> in the sidebar.
       </Lead>
       <Shot name="flows" alt="The Flows list" />
       <H>Building a flow</H>

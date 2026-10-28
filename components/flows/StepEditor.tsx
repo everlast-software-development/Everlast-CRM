@@ -5,6 +5,7 @@ import type { AssignableUser, FlowInputType, FlowMediaType, FlowNodeData, FlowNo
 import { BUILT_IN_VARIABLES, FLOW_LIMITS, STEP_META, VARIABLE_RE, carouselSnapshot, templateStartButtons, uid } from "@/lib/flows";
 import { CardsEditor } from "./CardsEditor";
 import { FormatTextarea } from "./FormatTextarea";
+import MediaField from "@/components/MediaField";
 
 const inputCls =
   "w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 bg-white";
@@ -221,7 +222,8 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
               <select
                 className={inputCls}
                 value={data.mediaType || "NONE"}
-                onChange={(e) => set({ mediaType: e.target.value as FlowMediaType })}
+                // A new kind needs a new file — an image link sent as a video fails.
+                onChange={(e) => set({ mediaType: e.target.value as FlowMediaType, mediaUrl: undefined })}
               >
                 <option value="NONE">None</option>
                 <option value="IMAGE">Image</option>
@@ -229,12 +231,14 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
                 <option value="DOCUMENT">Document (PDF)</option>
               </select>
               {data.mediaType && data.mediaType !== "NONE" && (
-                <input
-                  className={`${inputCls} mt-2`}
-                  value={data.mediaUrl || ""}
-                  placeholder="https://… public link to the file"
-                  onChange={(e) => set({ mediaUrl: e.target.value })}
-                />
+                <div className="mt-2">
+                  <MediaField
+                    key={data.mediaType}
+                    mediaType={data.mediaType}
+                    value={data.mediaUrl}
+                    onChange={(url) => set({ mediaUrl: url ?? undefined })}
+                  />
+                </div>
               )}
             </Field>
             <Field label="Text" aside={<Counter value={data.text} max={data.buttons?.length || data.link ? FLOW_LIMITS.body : FLOW_LIMITS.text} />}>
