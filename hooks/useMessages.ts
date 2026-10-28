@@ -28,6 +28,30 @@ function isTemp(m: Message): boolean {
   return getLocalId(m).startsWith("temp-");
 }
 
+// Every id a message can be known by here: the server's `id`, and the `_id`
+// a confirmed optimistic bubble carries. Two entries sharing one are the same
+// message. (Checking `id` alone let a bubble confirmed by the send response,
+// which only has `_id`, be shown a second time when the live event arrived.)
+function idsOf(m: Message): string[] {
+  return [m._id, m.id].filter((v) => v != null && v !== "").map(String).filter((v) => !v.startsWith("temp-"));
+}
+const sameMessage = (a: Message, b: Message) => idsOf(a).some((id) => idsOf(b).includes(id));
+
+// Delivery only moves forward: a late "sent" must not undo "read".
+const STATUS_RANK: Record<string, number> = { PENDING: 0, SENT: 1, DELIVERED: 2, READ: 3 };
+function furthestStatus(a: Message["status"], b: Message["status"]): Message["status"] {
+  if (a === "FAILED" || b === "FAILED") return "FAILED";
+  if (a == null) return b;
+  if (b == null) return a;
+  return (STATUS_RANK[String(b)] ?? -1) > (STATUS_RANK[String(a)] ?? -1) ? b : a;
+}
+
+// The server's copy wins (its time, not the agent's computer clock), keeping
+// the bubble's local key so React doesn't remount it, and the furthest status.
+function mergeServer(local: Message, server: Message): Message {
+  return { ...local, ...server, _id: local._id ?? server._id, status: furthestStatus(local.status, server.status) };
+}
+
 export function emitTypingStart(conversationId: number | string, username: string): void {
   getSocket().emit("typing.start", { conversationId, username });
 }
@@ -114,8 +138,14 @@ export function useMessages(conversationId: string): UseMessagesReturn {
       if (String(cid) !== conversationId) return;
 
       setMessages((prev) => {
-        // Dedup: if the real ID already exists (confirmed via HTTP before socket fired), skip
-        if (message.id != null && prev.some((m) => m.id != null && String(m.id) === String(message.id))) return prev;
+        // Already shown (the send response confirmed its bubble first): update
+        // that bubble with the server's copy instead of adding a second one.
+        const knownIdx = prev.findIndex((m) => sameMessage(m, message));
+        if (knownIdx !== -1) {
+          const next = [...prev];
+          next[knownIdx] = mergeServer(prev[knownIdx], message);
+          return next;
+        }
 
         if (String(message.senderType) === "AGENT") {
           // Replace the optimistic temp with the confirmed message
@@ -291,6 +321,15 @@ export function useMessages(conversationId: string): UseMessagesReturn {
     setMessages((prev) => {
       const idx = prev.findIndex((m) => getLocalId(m) === tempId);
       if (idx === -1) return prev;
+      // The live event got here first and the message is already on screen:
+      // drop the "sending…" bubble rather than show it twice.
+      const shown = prev.findIndex((m, i) => i !== idx && sameMessage(m, confirmed));
+      if (shown !== -1) {
+        const next = prev.filter((_, i) => i !== idx);
+        const at = shown > idx ? shown - 1 : shown;
+        next[at] = { ...next[at], status: furthestStatus(next[at].status, confirmed.status) };
+        return next;
+      }
       const next = [...prev];
       next[idx] = confirmed;
       return next;

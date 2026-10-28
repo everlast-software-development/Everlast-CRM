@@ -114,6 +114,8 @@ export interface SendMessageResponse {
     content: string;
     status: "SENT" | "FAILED";
     whatsappMessageId: string;
+    // Server time, so the bubble shows when it was really sent.
+    createdAt?: string;
   };
 }
 

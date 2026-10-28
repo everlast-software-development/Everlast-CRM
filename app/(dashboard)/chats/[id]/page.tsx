@@ -1419,9 +1419,12 @@ export default function ConversationPage() {
       const realId =
         ((res.data as Record<string, unknown>)._id as string) ??
         ((res.data as Record<string, unknown>).id as string);
+      // The server's id and time (not this computer's clock).
       confirmOptimistic(tempId, {
         ...optimistic,
         _id: realId,
+        id: res.data.id ?? realId,
+        createdAt: res.data.createdAt ?? optimistic.createdAt,
         status: res.data.status,
       });
     } catch (err) {
@@ -1548,7 +1551,7 @@ export default function ConversationPage() {
           const realId =
             ((res.data as Record<string, unknown>)._id as string) ??
             String((res.data as Record<string, unknown>).id);
-          confirmOptimistic(textTempId, { ...textMsg, _id: realId, status: res.data.status });
+          confirmOptimistic(textTempId, { ...textMsg, _id: realId, id: res.data.id ?? realId, createdAt: res.data.createdAt ?? textMsg.createdAt, status: res.data.status });
         } catch (err) {
           if (!handleWindowClosed(err, textTempId, textMsg.content)) {
             confirmOptimistic(textTempId, { ...textMsg, status: "FAILED" });
@@ -1566,7 +1569,7 @@ export default function ConversationPage() {
         const realId =
           ((res.data as Record<string, unknown>)._id as string) ??
           String((res.data as Record<string, unknown>).id);
-        confirmOptimistic(mediaTempId, { ...mediaMsg, _id: realId, content: url, mediaUrl: url, messageType, status: res.data.status });
+        confirmOptimistic(mediaTempId, { ...mediaMsg, _id: realId, id: res.data.id ?? realId, createdAt: res.data.createdAt ?? mediaMsg.createdAt, content: url, mediaUrl: url, messageType, status: res.data.status });
       } catch (err) {
         if (!handleWindowClosed(err, mediaTempId)) {
           confirmOptimistic(mediaTempId, { ...mediaMsg, status: "FAILED" });
