@@ -27,6 +27,7 @@ export interface OptOutState {
 /** How the opt-out came about, as a phrase: "(sent STOP · 12 Oct)". */
 export const OPT_OUT_SOURCE_LABEL: Record<string, string> = {
   KEYWORD: "sent STOP",
+  KEYWORD_ALL: "sent STOP ALL (every line)",
   WHATSAPP: "turned off offers in WhatsApp",
   MANUAL: "recorded by the team",
   IMPORT: "from an import",
@@ -35,7 +36,8 @@ export const optOutSourceLabel = (source: string | null | undefined) =>
   (source && OPT_OUT_SOURCE_LABEL[source]) || "opted out";
 
 /** The patient did this themselves (STOP, WhatsApp's own switch) — lifting it overrides them. */
-export const isPatientsOwnOptOut = (source: string | null | undefined) => source === "KEYWORD" || source === "WHATSAPP";
+export const isPatientsOwnOptOut = (source: string | null | undefined) =>
+  source === "KEYWORD" || source === "KEYWORD_ALL" || source === "WHATSAPP";
 
 export const isOptedOut = (s: OptOutState | null | undefined) => !!s && (s.all || !!s.line);
 

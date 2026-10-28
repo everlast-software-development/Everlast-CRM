@@ -312,11 +312,13 @@ const optOuts: DocPage = {
       <Shot name="chat-opted-out" alt="A chat with the opt-out banner" />
       <H>How a patient opts out or back in</H>
       <Table
-        head={["Patient sends (the whole message)", "Effect"]}
+        head={["Patient sends (the whole message, “please” / “من فضلك” allowed)", "Effect"]}
         rows={[
-          [<b key="s">STOP, STOPALL, UNSUBSCRIBE</b>, "Opted out of marketing on this line."],
-          [<b key="t">START, UNSTOP, SUBSCRIBE, RESUME</b>, "Lifts only the opt-out they made themselves."],
-          ["WhatsApp's own “Stop promotions”", "Honoured like STOP."],
+          [<b key="s">STOP, UNSUBSCRIBE, Stop promotions · توقف، إيقاف، إلغاء الاشتراك، لا أريد رسائل</b>, "Opted out of marketing on this line. They get a short confirmation in their language."],
+          [<b key="a">STOPALL, STOP ALL · أوقف الكل، إيقاف الكل</b>, "Opted out of marketing on every line."],
+          [<b key="t">START, SUBSCRIBE, RESUME · اشتراك، ابدأ، تفعيل</b>, "Lifts only the opt-outs they made themselves (on this line, and a STOP ALL), and confirms it."],
+          ["WhatsApp's own “Stop promotions”", "Honoured like STOP — straight away, or at the latest on the next send (error 131050)."],
+          [<b key="c">Cancel · إلغاء (alone)</b>, "Not an opt-out — at a clinic it usually means an appointment."],
         ]}
       />
       <Callout tone="note">CANCEL, END and QUIT are deliberately <b>not</b> opt-out words. Patients use them in everyday messages.</Callout>
