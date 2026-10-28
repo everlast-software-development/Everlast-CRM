@@ -1,4 +1,4 @@
-import { Type, Image as ImageIcon, Video, FileText, Ban, Link2, Phone, MessageSquareText } from "lucide-react";
+import { Type, Image as ImageIcon, Video, FileText, Ban, Link2, Phone, MessageSquareText, Copy } from "lucide-react";
 import type { TemplateButtonType, TemplateHeaderType } from "@/types";
 
 // Shared between the Templates list page and the Create/Edit Template page so
@@ -27,7 +27,23 @@ export const BUTTON_TYPE_META: Record<TemplateButtonType, { label: string; icon:
   QUICK_REPLY: { label: "Quick Reply", icon: MessageSquareText },
   URL: { label: "URL", icon: Link2 },
   PHONE_NUMBER: { label: "Call Number", icon: Phone },
+  COPY_CODE: { label: "Copy code", icon: Copy },
 };
+
+// Meta's button rules, mirrored from the API's utils/templateValidation.js.
+// More than 3 buttons: WhatsApp shows two and folds the rest under "See all
+// options". Quick Replies must sit together (QR, QR, URL — not QR, URL, QR).
+export const BUTTON_LIMITS: Record<TemplateButtonType | "total", number> = { total: 10, QUICK_REPLY: 10, URL: 2, PHONE_NUMBER: 1, COPY_CODE: 1 };
+export const COPY_CODE_TITLE = "Copy offer code";
+
+// Quick Replies kept together, on the side of whichever kind comes first —
+// the order Meta accepts and the API saves (groupButtons there).
+export function groupButtons<T extends { type: TemplateButtonType }>(buttons: T[]): T[] {
+  if (!buttons.length) return buttons;
+  const qr = buttons.filter((b) => b.type === "QUICK_REPLY");
+  const other = buttons.filter((b) => b.type !== "QUICK_REPLY");
+  return buttons[0].type === "QUICK_REPLY" ? [...qr, ...other] : [...other, ...qr];
+}
 
 export const OPT_OUT_TEXT = "Reply STOP to opt out";
 export const PLACEHOLDER_RE = /\{\{\s*[a-z0-9_]+\s*\}\}/gi;

@@ -23,6 +23,7 @@ import {
   Loader2,
   PanelRight,
   ShieldOff,
+  Copy,
 } from "lucide-react";
 import {
   useMessages,
@@ -103,8 +104,16 @@ function CampaignReplyTag({ campaign, linkable }: { campaign: { id: number; name
  * a full-width row with a reply, link or phone icon. Not clickable for quick
  * replies — they are the patient's to tap.
  */
-function WaButton({ type, title, url, phoneNumber }: { type?: string; title: string; url?: string; phoneNumber?: string }) {
+function WaButton({ type, title, url, phoneNumber, code }: { type?: string; title: string; url?: string; phoneNumber?: string; code?: string }) {
   const cls = "flex items-center justify-center gap-1.5 px-3 py-2 text-[13px] font-semibold text-brand-fg";
+  if (type === "COPY_CODE") {
+    return (
+      <div className={cls} title={code ? `Offer code: ${code}` : undefined}>
+        <Copy className="w-3.5 h-3.5 shrink-0" /> <WaText text={title} />
+        {code && <span className="font-mono font-normal text-gray-500">· {code}</span>}
+      </div>
+    );
+  }
   if (type === "URL" && url) {
     return (
       <a href={url} target="_blank" rel="noreferrer" className={`${cls} hover:bg-black/5 dark:hover:bg-white/5`}>
@@ -149,7 +158,7 @@ function parseTemplateContent(content: string): {
   headerMediaUrl?: string;
   body: string;
   footer?: string;
-  buttons?: { id: string; type?: "QUICK_REPLY" | "URL" | "PHONE_NUMBER"; title: string; url?: string; phoneNumber?: string }[];
+  buttons?: { id: string; type?: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE"; title: string; url?: string; phoneNumber?: string; code?: string }[];
   // A list message sent by a flow: the menu button and its options.
   list?: { buttonLabel: string; rows: { title: string; description?: string }[] };
   // A carousel template: swipeable cards under the body.

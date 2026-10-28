@@ -264,7 +264,7 @@ export type TemplateStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "
 export type TemplateSetupNeed = "variables" | "media";
 export type TemplateCategory = "GENERAL" | "RE_ENGAGEMENT" | "CAMPAIGN";
 export type TemplateHeaderType = "NONE" | "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
-export type TemplateButtonType = "QUICK_REPLY" | "URL" | "PHONE_NUMBER";
+export type TemplateButtonType = "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE";
 
 export interface TemplateButton {
   id: string;
@@ -272,6 +272,8 @@ export interface TemplateButton {
   title: string;
   url?: string;
   phoneNumber?: string;
+  // COPY_CODE: the offer code the patient copies (≤15 letters or digits).
+  code?: string;
 }
 
 export interface Template {

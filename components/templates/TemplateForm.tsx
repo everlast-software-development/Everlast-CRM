@@ -16,6 +16,8 @@ import {
   Strikethrough,
   Code,
   Smile,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { ApiError, apiCreateTemplate, apiUpdateTemplate, apiUploadToMediaLibrary } from "@/lib/api";
 import MediaPicker, { ACCEPT_BY_TYPE } from "@/components/MediaPicker";
@@ -24,6 +26,9 @@ import {
   PERSONALIZE_VARS,
   HEADER_TYPE_OPTIONS,
   BUTTON_TYPE_META,
+  BUTTON_LIMITS,
+  COPY_CODE_TITLE,
+  groupButtons,
   OPT_OUT_TEXT,
   PLACEHOLDER_RE,
   headerCharError,
@@ -202,25 +207,33 @@ export default function TemplateForm({
     }
   }
 
-  const hasQuickReply = buttons.some((b) => b.type === "QUICK_REPLY");
-  const hasCTA = buttons.some((b) => b.type === "URL" || b.type === "PHONE_NUMBER");
-  const urlCount = buttons.filter((b) => b.type === "URL").length;
-  const phoneCount = buttons.filter((b) => b.type === "PHONE_NUMBER").length;
-  const canAddQuickReply = buttons.length < 3 && !hasCTA;
-  const canAddUrl = buttons.length < 3 && !hasQuickReply && urlCount < 2;
-  const canAddPhone = buttons.length < 3 && !hasQuickReply && phoneCount < 1;
+  const countOf = (type: TemplateButtonType) => buttons.filter((b) => b.type === type).length;
+  const isGeneral = category === "GENERAL";
+  // Why a button kind can't be added right now, or null when it can.
+  function addBlocked(type: TemplateButtonType): string | null {
+    if (buttons.length >= BUTTON_LIMITS.total) return `Maximum ${BUTTON_LIMITS.total} buttons`;
+    if (type === "COPY_CODE" && isGeneral) return "For offers — choose Campaign or Re-engagement";
+    if (countOf(type) >= BUTTON_LIMITS[type]) {
+      const n = BUTTON_LIMITS[type];
+      return `Maximum ${n} ${BUTTON_TYPE_META[type].label} button${n > 1 ? "s" : ""}`;
+    }
+    return null;
+  }
 
   function addButton(type: TemplateButtonType) {
-    setButtons((prev) => [
-      ...prev,
-      {
-        id: `btn_${Date.now()}`,
-        type,
-        title: "",
-        ...(type === "URL" ? { url: "" } : {}),
-        ...(type === "PHONE_NUMBER" ? { phoneNumber: "" } : {}),
-      },
-    ]);
+    setButtons((prev) =>
+      groupButtons([
+        ...prev,
+        {
+          id: `btn_${Date.now()}`,
+          type,
+          title: type === "COPY_CODE" ? COPY_CODE_TITLE : "",
+          ...(type === "URL" ? { url: "" } : {}),
+          ...(type === "PHONE_NUMBER" ? { phoneNumber: "" } : {}),
+          ...(type === "COPY_CODE" ? { code: "" } : {}),
+        },
+      ]),
+    );
     setShowAddButtonMenu(false);
   }
   function updateButton(i: number, patch: Partial<TemplateButton>) {
@@ -233,16 +246,50 @@ export default function TemplateForm({
   function removeButton(i: number) {
     setButtons((prev) => prev.filter((_, idx) => idx !== i));
   }
+  // Up/down within its group; across the boundary the two groups (Quick
+  // Replies and the rest) trade places, since Meta needs each kept together.
+  function moveButton(i: number, step: -1 | 1) {
+    setButtons((prev) => {
+      const j = i + step;
+      if (j < 0 || j >= prev.length) return prev;
+      const isQr = (b: TemplateButton) => b.type === "QUICK_REPLY";
+      if (isQr(prev[i]) === isQr(prev[j])) {
+        const n = [...prev];
+        [n[i], n[j]] = [n[j], n[i]];
+        return n;
+      }
+      const mine = prev.filter((b) => isQr(b) === isQr(prev[i]));
+      const others = prev.filter((b) => isQr(b) !== isQr(prev[i]));
+      return step < 0 ? [...mine, ...others] : [...others, ...mine];
+    });
+  }
+  // A personalised link: one placeholder, at the very end of the URL.
+  function setLinkVariable(i: number, key: string | null) {
+    const base = (buttons[i].url ?? "").replace(/\{\{[^{}]*\}\}$/, "");
+    updateButton(i, { url: key ? `${base}{{${key}}}` : base });
+  }
 
   function validateButtonsClientSide(): string | null {
+    const known = PERSONALIZE_VARS.map((v) => v.key);
     for (const b of buttons) {
+      if (b.type === "COPY_CODE") {
+        if (!b.code?.trim()) return "The Copy code button needs the offer code.";
+        if (!/^[A-Za-z0-9]{1,15}$/.test(b.code.trim())) return "The offer code must be 1–15 letters or digits, no spaces.";
+        if (isGeneral) return "A Copy code button is for offers — choose Campaign or Re-engagement as the category.";
+        continue;
+      }
       if (!b.title.trim()) return "All buttons need a title.";
       if (b.title.length > LIMITS.button) return `Button title "${b.title}" exceeds ${LIMITS.button} characters.`;
       if ((b.title.match(PLACEHOLDER_RE) || []).length > 0) return "Button titles can't contain placeholders.";
       if (b.type === "URL") {
         if (!b.url?.trim()) return "Every URL button needs a URL.";
         if (!/^https?:\/\//i.test(b.url)) return "Button URLs must start with http:// or https://.";
-        if ((b.url.match(PLACEHOLDER_RE) || []).length > 1) return "A URL button can have at most 1 placeholder.";
+        const vars = b.url.match(/\{\{[^{}]*\}\}/g) || [];
+        if (vars.length > 1) return "A URL button can have at most 1 placeholder.";
+        if (vars.length === 1) {
+          if (!known.includes(vars[0].replace(/[{}\s]/g, "").toLowerCase())) return `Unknown placeholder ${vars[0]} in "${b.title}"'s link.`;
+          if (!/\{\{[^{}]*\}\}$/.test(b.url.trim())) return `The placeholder in "${b.title}"'s link must be at the very end.`;
+        }
       }
       if (b.type === "PHONE_NUMBER" && !b.phoneNumber?.trim()) {
         return "Every Call Number button needs a phone number.";
@@ -306,7 +353,8 @@ export default function TemplateForm({
             headerMediaUrl: ["IMAGE", "VIDEO", "DOCUMENT"].includes(headerType) ? headerMediaUrl.trim() : undefined,
             body: body.trim(),
             footer: footer.trim() || undefined,
-            buttons: buttons.length > 0 ? buttons : undefined,
+            // [] on an edit clears the buttons (undefined would keep the old ones).
+            buttons: buttons.length > 0 ? buttons : isEditing ? [] : undefined,
             // Switching an existing carousel back to a standard template.
             ...(isEditing && template?.cards?.length ? { cards: [] as TemplateCard[] } : {}),
           };
@@ -698,7 +746,7 @@ export default function TemplateForm({
                 <label className="text-[12px] font-semibold text-gray-600">
                   Buttons{" "}
                   <span className="font-normal text-gray-400">
-                    (optional, max 3)
+                    (optional, {buttons.length}/{BUTTON_LIMITS.total})
                   </span>
                 </label>
               </div>
@@ -706,8 +754,8 @@ export default function TemplateForm({
                 <button
                   type="button"
                   onClick={() => setShowAddButtonMenu((v) => !v)}
-                  disabled={buttons.length >= 3}
-                  title={buttons.length >= 3 ? "Maximum 3 buttons reached" : undefined}
+                  disabled={buttons.length >= BUTTON_LIMITS.total}
+                  title={buttons.length >= BUTTON_LIMITS.total ? `Maximum ${BUTTON_LIMITS.total} buttons reached` : undefined}
                   className={`flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                     showAddButtonMenu
                       ? "border-brand bg-brand-200 text-brand-fg"
@@ -718,29 +766,29 @@ export default function TemplateForm({
                 </button>
 
                 {showAddButtonMenu && (
-                  <div className="absolute top-full left-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-10 py-1.5 overflow-hidden">
-                    {(["QUICK_REPLY", "URL", "PHONE_NUMBER"] as TemplateButtonType[]).map((type) => {
+                  <div className="absolute top-full left-0 mt-1.5 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-10 py-1.5 overflow-hidden">
+                    {(["QUICK_REPLY", "URL", "PHONE_NUMBER", "COPY_CODE"] as TemplateButtonType[]).map((type) => {
                       const meta = BUTTON_TYPE_META[type];
                       const Icon = meta.icon;
-                      const disabled = type === "QUICK_REPLY" ? !canAddQuickReply : type === "URL" ? !canAddUrl : !canAddPhone;
-                      const reason =
-                        type === "QUICK_REPLY"
-                          ? (hasCTA ? "Can't mix with Call Number/URL buttons" : undefined)
-                          : type === "URL"
-                            ? (hasQuickReply ? "Can't mix with Quick Reply buttons" : urlCount >= 2 ? "Maximum 2 URL buttons" : undefined)
-                            : (hasQuickReply ? "Can't mix with Quick Reply buttons" : phoneCount >= 1 ? "Maximum 1 Call Number button" : undefined);
+                      const reason = addBlocked(type);
+                      const hint = {
+                        QUICK_REPLY: "The patient taps it to answer — starts a flow",
+                        URL: "Opens a link — can be personalised per patient",
+                        PHONE_NUMBER: "Calls the clinic",
+                        COPY_CODE: "Copies an offer code to the patient's phone",
+                      }[type];
                       return (
                         <button
                           key={type}
                           type="button"
                           onClick={() => addButton(type)}
-                          disabled={disabled}
+                          disabled={!!reason}
                           className="w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                         >
                           {Icon && <Icon className="w-4 h-4 text-brand-fg shrink-0 mt-0.5" />}
                           <span className="flex-1 min-w-0">
                             <span className="block text-[13px] font-medium text-gray-800">{meta.label}</span>
-                            {reason && <span className="block text-[10.5px] text-gray-400 mt-0.5">{reason}</span>}
+                            <span className="block text-[10.5px] text-gray-400 mt-0.5">{reason ?? hint}</span>
                           </span>
                         </button>
                       );
@@ -750,45 +798,98 @@ export default function TemplateForm({
               </div>
 
               <div className="space-y-2.5">
-                {buttons.map((btn, i) => (
+                {buttons.map((btn, i) => {
+                  const linkVar = btn.type === "URL" ? (btn.url ?? "").match(/\{\{\s*([a-z_]+)\s*\}\}$/i)?.[1]?.toLowerCase() ?? null : null;
+                  return (
                   <div key={btn.id} className="border border-gray-200 rounded-xl p-2.5 space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 shrink-0 w-28">
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 shrink-0 w-24">
                         {(() => { const M = BUTTON_TYPE_META[btn.type]?.icon; return M ? <M className="w-3 h-3" /> : null; })()}
                         {BUTTON_TYPE_META[btn.type]?.label ?? "Quick Reply"}
                       </span>
-                      <input
-                        type="text"
-                        value={btn.title}
-                        onChange={(e) => updateButton(i, { title: e.target.value.replace(/[{}]/g, "") })}
-                        placeholder="Button name"
-                        maxLength={LIMITS.button}
-                        className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-800 outline-none focus:border-brand"
-                      />
-                      <CharCount val={btn.title} max={LIMITS.button} />
+                      {btn.type === "COPY_CODE" ? (
+                        <span className="flex-1 text-[13px] text-gray-500 px-2.5 py-1.5" title="WhatsApp sets this label">
+                          {COPY_CODE_TITLE}
+                        </span>
+                      ) : (
+                        <>
+                          <input
+                            type="text"
+                            value={btn.title}
+                            onChange={(e) => updateButton(i, { title: e.target.value.replace(/[{}]/g, "") })}
+                            placeholder="Button name"
+                            maxLength={LIMITS.button}
+                            dir="auto"
+                            className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-800 outline-none focus:border-brand"
+                          />
+                          <CharCount val={btn.title} max={LIMITS.button} />
+                        </>
+                      )}
+                      {buttons.length > 1 && (
+                        <span className="flex shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => moveButton(i, -1)}
+                            disabled={i === 0}
+                            aria-label="Move up"
+                            className="w-6 h-7 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveButton(i, 1)}
+                            disabled={i === buttons.length - 1}
+                            aria-label="Move down"
+                            className="w-6 h-7 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => removeButton(i)}
+                        aria-label="Remove button"
                         className="w-7 h-7 rounded-full hover:bg-red-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors cursor-pointer shrink-0"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     {btn.type === "URL" && (
-                      <input
-                        type="url"
-                        value={btn.url ?? ""}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          // Hard-block a 2nd placeholder rather than just
-                          // flagging it after the fact — the keystroke that
-                          // would exceed the limit is simply rejected.
-                          if ((next.match(PLACEHOLDER_RE) || []).length > 1) return;
-                          updateButton(i, { url: next });
-                        }}
-                        placeholder="https://example.com or https://example.com/{{1}}"
-                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-800 outline-none focus:border-brand font-mono"
-                      />
+                      <>
+                        <input
+                          type="url"
+                          value={btn.url ?? ""}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            // Hard-block a 2nd placeholder rather than just
+                            // flagging it after the fact — the keystroke that
+                            // would exceed the limit is simply rejected.
+                            if ((next.match(PLACEHOLDER_RE) || []).length > 1) return;
+                            updateButton(i, { url: next });
+                          }}
+                          placeholder="https://everlastwellness.store/offers"
+                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-800 outline-none focus:border-brand font-mono"
+                        />
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] text-gray-400">Personalise the link with:</span>
+                          {PERSONALIZE_VARS.map((v) => (
+                            <button
+                              key={v.key}
+                              type="button"
+                              onClick={() => setLinkVariable(i, linkVar === v.key ? null : v.key)}
+                              className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
+                                linkVar === v.key
+                                  ? "border-brand bg-brand-100 text-brand-fg font-semibold"
+                                  : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                              }`}
+                            >
+                              {v.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
                     )}
                     {btn.type === "PHONE_NUMBER" && (
                       <input
@@ -799,19 +900,32 @@ export default function TemplateForm({
                         className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-800 outline-none focus:border-brand font-mono"
                       />
                     )}
+                    {btn.type === "COPY_CODE" && (
+                      <input
+                        type="text"
+                        value={btn.code ?? ""}
+                        onChange={(e) => updateButton(i, { code: e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase() })}
+                        placeholder="Offer code, e.g. EVERLAST20"
+                        maxLength={15}
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] text-gray-800 outline-none focus:border-brand font-mono tracking-wide"
+                      />
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {(buttons.length > 0 || hasCTA || hasQuickReply) && (
+              {buttons.length > 0 && (
                 <div className={`mt-2.5 border rounded-xl px-3 py-2.5 space-y-1 ${buttonsError ? "bg-red-50 border-red-100" : "bg-gray-50 border-gray-100"}`}>
                   <p className={`text-[11px] font-semibold ${buttonsError ? "text-red-600" : "text-gray-500"}`}>
                     {buttonsError ? buttonsError : "Points to remember"}
                   </p>
                   <ul className={`text-[11px] space-y-0.5 list-disc list-inside ${buttonsError ? "text-red-400" : "text-gray-400"}`}>
-                    <li>3 Quick Reply buttons, OR up to 2 URL + 1 Call Number button — not both.</li>
+                    <li>Up to 10 buttons: Quick Reply (10), URL (2), Call Number (1), Copy code (1) — mix them freely.</li>
+                    <li>Quick Replies stay together; the arrows move a button, or swap the two groups.</li>
+                    <li>With more than 3, WhatsApp shows 2 and puts the rest under “See all options”.</li>
                     <li>Maximum 25 characters per button name, no placeholders.</li>
-                    <li>URL must start with http:// or https:// — at most 1 placeholder.</li>
+                    <li>A link can end with the patient&apos;s name — filled in for each patient when sent.</li>
                   </ul>
                 </div>
               )}

@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   CheckCheck,
+  Copy,
   CornerUpLeft,
   EllipsisVertical,
   ExternalLink,
@@ -219,7 +220,7 @@ function WaSheet({ title, onClose, children }: { title: string; onClose: () => v
 
 export type WaAction = {
   key: string;
-  kind: "reply" | "url" | "phone" | "list";
+  kind: "reply" | "url" | "phone" | "copy" | "list";
   label: string;
   /** Opens in a new tab. */
   href?: string;
@@ -227,7 +228,7 @@ export type WaAction = {
   disabled?: boolean;
 };
 
-const ACTION_ICON = { reply: CornerUpLeft, url: ExternalLink, phone: Phone, list: List };
+const ACTION_ICON = { reply: CornerUpLeft, url: ExternalLink, phone: Phone, copy: Copy, list: List };
 
 function WaStrip({ action }: { action: WaAction }) {
   const Icon = ACTION_ICON[action.kind];
@@ -535,7 +536,7 @@ export function WaCarousel({ cards }: { cards: WaCardSpec[] }) {
 
 // ── Templates ─────────────────────────────────────────────────────────────────
 
-const TEMPLATE_KIND: Record<string, WaAction["kind"]> = { QUICK_REPLY: "reply", URL: "url", PHONE_NUMBER: "phone" };
+const TEMPLATE_KIND: Record<string, WaAction["kind"]> = { QUICK_REPLY: "reply", URL: "url", PHONE_NUMBER: "phone", COPY_CODE: "copy" };
 
 export function templateActions(buttons: Pick<TemplateButton, "id" | "type" | "title">[]): WaAction[] {
   return buttons.map((b, i) => ({ key: b.id || String(i), kind: TEMPLATE_KIND[b.type] ?? "reply", label: b.title }));
