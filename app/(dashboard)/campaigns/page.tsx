@@ -14,7 +14,6 @@ import {
   Play,
   Loader2,
   Trash2,
-  Workflow,
   Hourglass,
   Send,
   AlertCircle,
@@ -684,13 +683,6 @@ export default function CampaignsPage() {
             >
               <Upload className="w-4 h-4" />
               Export
-            </button>
-            <button
-              onClick={() => router.push("/campaigns/flows")}
-              className="flex items-center gap-1.5 text-[13px] font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors cursor-pointer"
-            >
-              <Workflow className="w-4 h-4" />
-              Flows
             </button>
             {canWrite && (
               <button

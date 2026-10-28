@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, startTransition } from "react";
+import { useState, useEffect, useRef, useSyncExternalStore, startTransition } from "react";
 import type { ReactNode } from "react";
 import {
   MessageSquare,
@@ -22,6 +22,8 @@ import {
   X,
   LogOut,
   BookMarked,
+  Workflow,
+  Pin,
 } from "lucide-react";
 import { getSocket, disconnectSocket } from "@/lib/socket";
 import { apiLogout, apiGetLineCounts, apiGetPendingApprovals, apiGetErrorSummary } from "@/lib/api";
@@ -39,6 +41,23 @@ import { MyStatusMenu } from "@/components/MyStatusMenu";
 
 const COLLAPSED_W = "w-14";   // 56px icon rail
 const EXPANDED_W  = "w-[260px]";
+
+// "Keep open": the sidebar stays expanded beside the page (not over it), on
+// every page, and is remembered in this browser. A tiny store so every reader
+// agrees and the server render (which can't see localStorage) starts closed.
+const STICK_KEY = "sidebar:stuck";
+const stickListeners = new Set<() => void>();
+function readStuck() {
+  try { return localStorage.getItem(STICK_KEY) === "1"; } catch { return false; }
+}
+function setStuckStored(on: boolean) {
+  try { localStorage.setItem(STICK_KEY, on ? "1" : "0"); } catch {}
+  stickListeners.forEach((l) => l());
+}
+function subscribeStuck(listener: () => void) {
+  stickListeners.add(listener);
+  return () => { stickListeners.delete(listener); };
+}
 
 // The provider sits ABOVE the shell so the switcher itself is outside the
 // remount boundary below — switching must not unmount the control you just used.
@@ -127,7 +146,13 @@ function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { can } = useCurrentUser();
-  const [expanded, setExpanded] = useState(false);
+  // The desktop sidebar is either an icon rail that opens over the page while
+  // the pointer rests on it (a peek), or kept open beside the page ("stuck",
+  // remembered in this browser). One button at the bottom switches between them.
+  const [hovered, setHovered] = useState(false);
+  const stuck = useSyncExternalStore(subscribeStuck, readStuck, () => false);
+  const expanded = stuck || hovered;
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   // Tagged with the number it was fetched for, so a count belonging to the
   // previous number can never be displayed — it is simply ignored once the
@@ -152,17 +177,24 @@ function DashboardShell({ children }: { children: ReactNode }) {
     if (pathname.startsWith("/customers")) setContactsOpen(true);
   }, [pathname]);
 
-  // The desktop drawer opens and closes only from its toggle button (or the
-  // Contacts item); hovering does nothing. It overlays the page, so it folds
-  // back to the icon rail after you navigate or click the backdrop.
-  function toggleExpanded() {
-    setExpanded((v) => !v);
+  // Hovering opens the rail after a short pause (so sweeping the pointer past
+  // it doesn't flash it open); leaving closes it again.
+  function handleSidebarEnter() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setHovered(true), 150);
   }
+  function handleSidebarLeave() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+    setHovered(false);
+  }
+  useEffect(() => () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }, []);
 
-  const [expandedPath, setExpandedPath] = useState(pathname);
-  if (expandedPath !== pathname) {
-    setExpandedPath(pathname);
-    setExpanded(false);
+  // Keep open ⇄ collapse. Collapsing also ends the peek, so the rail folds
+  // straight away even though the pointer is still on it.
+  function toggleStuck() {
+    setStuckStored(!stuck);
+    setHovered(false);
   }
 
   async function handleLogout() {
@@ -240,13 +272,14 @@ function DashboardShell({ children }: { children: ReactNode }) {
   // Auto-close on navigation
   useEffect(() => {
     startTransition(() => {
-      setExpanded(false);
       setMobileOpen(false);
     });
   }, [pathname]);
 
   function isActive(href: string) {
     const path = href.split("?")[0];
+    // Flows live under /campaigns but have their own sidebar item.
+    if (path === "/campaigns" && isActive("/campaigns/flows")) return false;
     return pathname === path || pathname.startsWith(path + "/");
   }
 
@@ -261,6 +294,9 @@ function DashboardShell({ children }: { children: ReactNode }) {
   ].filter((i) => can(i.perm));
   const navAfterContacts = [
     { href: "/campaigns",        icon: Megaphone,       label: "Campaigns",    enabled: true, perm: "campaign:read" as const, badge: canApprove && pendingApprovals > 0 ? pendingApprovals : undefined },
+    // What happens after a campaign's buttons are tapped. Supervisors and
+    // directors see the responses only (the page hides the builder).
+    { href: "/campaigns/flows",  icon: Workflow,        label: "Flows",        enabled: true, perm: "campaign:read" as const },
     // The in-app guide. Everyone gets it; its pages follow the reader's permissions.
     { href: "/docs",             icon: BookMarked,      label: "Documentation", enabled: true, perm: null },
   ].filter((i) => !i.perm || can(i.perm));
@@ -339,7 +375,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
           className={`${base} ${expanded ? "gap-3 px-3" : "justify-center"} ${
             active
               ? "bg-brand-100 text-brand-fg"
-              : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+              : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
           }`}
         >
           {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-brand rounded-r-full" />}
@@ -392,7 +428,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
       <button
         type="button"
         onClick={() => {
-          if (!expanded) setExpanded(true);
+          if (!expanded) setHovered(true);
           setContactsOpen((v) => !v);
         }}
         aria-label={!expanded ? "Contacts" : undefined}
@@ -584,20 +620,14 @@ function DashboardShell({ children }: { children: ReactNode }) {
 
       {/* ══════════════ DESKTOP ══════════════ */}
 
-      {/* expanded backdrop (behind drawer, in front of content) */}
-      {expanded && (
-        <div
-          onClick={() => setExpanded(false)}
-          className="hidden lg:block fixed inset-0 z-[39] bg-black/10"
-        />
-      )}
-
       {/* icon rail → full drawer */}
       <div
-        className={`hidden lg:flex fixed top-0 left-0 h-full flex-col bg-white border-r border-gray-100 z-40 overflow-hidden transition-[width] duration-300 ease-in-out ${expanded ? EXPANDED_W : COLLAPSED_W}`}
+        onMouseEnter={handleSidebarEnter}
+        onMouseLeave={handleSidebarLeave}
+        className={`hidden lg:flex fixed top-0 left-0 h-full flex-col bg-white border-r border-gray-200 z-40 overflow-hidden transition-[width,box-shadow] duration-300 ease-in-out ${expanded ? EXPANDED_W : COLLAPSED_W} ${hovered && !stuck ? "shadow-[8px_0_24px_-12px_rgba(0,0,0,0.18)]" : ""}`}
       >
-        {/* Logo row */}
-        <div className={`shrink-0 flex items-center border-b border-gray-100 h-[57px] overflow-hidden transition-[padding] duration-300 ${expanded ? "px-4 gap-2.5" : "justify-center"}`}>
+        {/* Logo row — the same height as the top bar so their bottom lines meet */}
+        <div className={`shrink-0 flex items-center border-b border-gray-100 h-12 overflow-hidden transition-[padding] duration-300 ${expanded ? "px-4 gap-2.5" : "justify-center"}`}>
           <div className="w-7 h-7 rounded-full bg-brand flex items-center justify-center shrink-0">
             <span className="text-white font-bold text-sm leading-none">E</span>
           </div>
@@ -622,42 +652,42 @@ function DashboardShell({ children }: { children: ReactNode }) {
           )}
         </nav>
 
-        {/* Expand / collapse toggle */}
-        <div className="shrink-0 border-t border-gray-100 p-2">
-          <SideTip show={!expanded} label="Expand menu">
-          <button
-            onClick={toggleExpanded}
-            aria-label={expanded ? "Collapse menu" : "Expand menu"}
-            className={`flex items-center h-10 w-full rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors overflow-hidden ${expanded ? "gap-3 px-3" : "justify-center"}`}
-          >
-            {expanded
-              ? <ChevronsLeft  className="w-[18px] h-[18px] shrink-0" />
-              : <ChevronsRight className="w-[18px] h-[18px] shrink-0" />}
-            <span className={`text-[13.5px] whitespace-nowrap transition-[opacity,max-width] duration-200 delay-75 ${expanded ? "opacity-100 max-w-[180px]" : "opacity-0 max-w-0"}`}>
-              Collapse
-            </span>
-          </button>
-          </SideTip>
-        </div>
+        {/* Signed-in user, sign-out beside them */}
+        <div className="shrink-0 border-t border-gray-100 p-2 space-y-1">
+          <div className={`flex items-center ${expanded ? "gap-1" : "flex-col gap-1"}`}>
+            <div className="flex-1 min-w-0 w-full">
+              <SidebarUser expanded={expanded} onExpand={toggleStuck} />
+            </div>
+            <SideTip show label="Sign out">
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Sign out"
+                className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </SideTip>
+          </div>
 
-        {/* Signed-in user */}
-        <div className="shrink-0 border-t border-gray-100 p-2">
-          <SidebarUser expanded={expanded} onExpand={toggleExpanded} />
-        </div>
-
-        {/* Logout */}
-        <div className="shrink-0 border-t border-gray-100 p-2">
-          <SideTip show={!expanded} label="Sign out">
-          <button
-            onClick={handleLogout}
-            aria-label={!expanded ? "Sign out" : undefined}
-            className={`flex items-center h-10 w-full rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors overflow-hidden ${expanded ? "gap-3 px-3" : "justify-center"}`}
-          >
-            <LogOut className="w-[18px] h-[18px] shrink-0" />
-            <span className={`text-[13.5px] whitespace-nowrap transition-[opacity,max-width] duration-200 delay-75 ${expanded ? "opacity-100 max-w-[180px]" : "opacity-0 max-w-0"}`}>
-              Sign out
-            </span>
-          </button>
+          {/* Keep open / collapse */}
+          <SideTip show={!expanded} label="Keep the menu open">
+            <button
+              type="button"
+              onClick={toggleStuck}
+              aria-pressed={stuck}
+              aria-label={stuck ? "Collapse the menu" : "Keep the menu open"}
+              className={`flex items-center h-9 w-full rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors overflow-hidden cursor-pointer ${expanded ? "gap-3 px-3" : "justify-center"}`}
+            >
+              {stuck
+                ? <ChevronsLeft className="w-[18px] h-[18px] shrink-0" />
+                : expanded
+                  ? <Pin className="w-[17px] h-[17px] shrink-0" />
+                  : <ChevronsRight className="w-[18px] h-[18px] shrink-0" />}
+              <span className={`text-[13px] whitespace-nowrap transition-[opacity,max-width] duration-200 delay-75 ${expanded ? "opacity-100 max-w-[180px]" : "opacity-0 max-w-0"}`}>
+                {stuck ? "Collapse menu" : "Keep menu open"}
+              </span>
+            </button>
           </SideTip>
         </div>
       </div>
@@ -674,7 +704,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
 
           Requests already in flight are handled separately, in lib/api.ts: the
           remount does not cancel them. Do not remove one without the other. */}
-      <div className="lg:ml-14 pt-12 lg:pt-0 h-screen flex flex-col overflow-hidden">
+      <div className={`${stuck ? "lg:ml-[260px]" : "lg:ml-14"} pt-12 lg:pt-0 h-screen flex flex-col overflow-hidden transition-[margin] duration-300 ease-in-out`}>
         {/* Desktop top bar. Deliberately OUTSIDE the keyed div below: if the
             switcher lived inside it, choosing a number would unmount the very
             menu you just clicked. (Mobile has its own bar, above.)

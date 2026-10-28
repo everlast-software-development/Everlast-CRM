@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ClipboardCopy, CopyPlus, Download, Plus, Trash2, Upload, Workflow } from "lucide-react";
+import { ClipboardCopy, CopyPlus, Download, Plus, Trash2, Upload, Workflow } from "lucide-react";
 import { ApiError, apiCreateFlow, apiDeleteFlow, apiDuplicateFlow, apiGetFlow, apiGetFlows, apiGetTemplates, apiUpdateFlow } from "@/lib/api";
 import { FlowFileError, downloadFlowFile, flowFileText, openImportedDraft, parseFlowFile, readFlowFile, relinkTemplates } from "@/lib/flowTransfer";
 import { validateFlow } from "@/lib/flows";
@@ -174,10 +173,7 @@ export default function FlowsPage() {
 
   return (
     <div className="p-6 lg:p-8 bg-canvas min-h-full overflow-y-auto">
-      <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-gray-800">
-        <ArrowLeft className="w-4 h-4" /> Campaigns
-      </Link>
-      <div className="flex items-start justify-between mt-3">
+      <div className="flex items-start justify-between">
         <div>
           <h1 className="font-bold text-2xl text-gray-900">Flows</h1>
           <p className="text-sm text-gray-400 mt-0.5 max-w-2xl">
