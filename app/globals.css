@@ -78,7 +78,9 @@
 
     /* React Flow canvas (components/flows/FlowBuilder.tsx). */
     --flow-grid: #e5e7eb;
-    --flow-edge: #9CA3AF;
+    --flow-edge: #8b929c;
+    /* A line under the pointer or selected (its scissors showing). */
+    --flow-edge-active: #3b694c;
     /* Glow behind the live wall's top-right corner. */
     --wall-glow: rgba(59, 105, 76, 0.10);
   }
@@ -274,7 +276,8 @@
       --color-wall-ink: #ffffff;
       --wall-glow: rgba(59, 105, 76, 0.22);
       --flow-grid: #2a302d;
-      --flow-edge: #5f6964;
+      --flow-edge: #77817c;
+      --flow-edge-active: #7fbf96;
 
       /* shadcn tokens (components/ui) — the same surfaces as above */
       --background: 150 8% 9.4%;

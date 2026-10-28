@@ -18,12 +18,13 @@ import {
   SelectionMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ClipboardPaste, Copy, CopyPlus, GripVertical, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, FlaskConical, GalleryHorizontal, Images } from "lucide-react";
+import { ClipboardPaste, Copy, CopyPlus, GripVertical, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, FlaskConical, GalleryHorizontal, Images, Redo2, Scissors, Undo2 } from "lucide-react";
 import type { AssignableUser, FlowGraph, FlowNodeData, FlowNodeType, FlowValidationError, Template } from "@/types";
 import { ADDABLE_STEPS, STEP_META, defaultData, outputsOf, uid, validateFlow } from "@/lib/flows";
 import { readFlowFile, relinkTemplates } from "@/lib/flowTransfer";
 import { StepNode, type StepFlowNode } from "./StepNode";
 import { StepEditor } from "./StepEditor";
+import { CutEdge, EdgeEditContext } from "./CutEdge";
 import { FlowSimulator } from "./FlowSimulator";
 import { useTheme } from "@/components/ThemeProvider";
 import { useToast } from "@/components/ui/toast";
@@ -52,12 +53,22 @@ const PALETTE_ICONS: Partial<Record<FlowNodeType, React.ComponentType<{ classNam
   end: Flag,
 };
 
+// Every line is a CutEdge: a smooth-step line with a scissors button in the
+// middle while it's pointed at or selected.
+const edgeTypes = { cut: CutEdge };
+
 const EDGE_DEFAULTS = {
-  type: "smoothstep",
-  markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#9CA3AF" },
+  type: "cut",
+  markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: "#8b929c" },
   // Line colour follows the theme (--flow-edge in globals.css).
-  style: { stroke: "var(--flow-edge)", strokeWidth: 1.5 },
+  style: { stroke: "var(--flow-edge)", strokeWidth: 2.5 },
 };
+
+// Undo history: each entry is the canvas before an edit. Edits less than
+// HISTORY_GROUP_MS apart (a drag, typing in a field) are one step to undo.
+type Snap = { nodes: StepFlowNode[]; edges: Edge[] };
+const HISTORY_LIMIT = 100;
+const HISTORY_GROUP_MS = 600;
 
 // A step card's width (StepNode.tsx): dropped and clicked steps are centred
 // on the point they're placed at.
@@ -434,12 +445,105 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
     placeClip(clip, { x: minX + 48, y: minY + 48 });
   }, [selectedSteps, clipOf, placeClip]);
 
+  // Cut (Ctrl+X): copy the selected steps, then remove them and their lines.
+  const cutSelected = useCallback(async () => {
+    if (!selectedSteps.length) {
+      toast.error("Select one or more steps to cut");
+      return;
+    }
+    const clip = clipOf(selectedSteps);
+    memoryClip = clip;
+    setCanPaste(true);
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(clip));
+    } catch {
+      // Clipboard blocked: the in-memory copy still pastes in this tab.
+    }
+    const ids = new Set(clip.nodes.map((n) => n.id));
+    setNodes((ns) => ns.filter((n) => !ids.has(n.id)));
+    setEdges((es) => es.filter((e) => !ids.has(e.source) && !ids.has(e.target)));
+    setSelectedId((s) => (s && ids.has(s) ? null : s));
+    markDirty();
+    toast.success(`Cut ${clip.nodes.length} step${clip.nodes.length > 1 ? "s" : ""} — paste with Ctrl+V`);
+  }, [selectedSteps, clipOf, markDirty, toast]);
+
+  // ── Undo / redo (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z) ──
+  // Watches the saved shape of the canvas (steps, their content and position,
+  // lines): selecting or zooming is not an edit. The canvas before each edit
+  // goes on the undo stack; a burst of edits (dragging, typing) is grouped.
+  const past = useRef<Snap[]>([]);
+  const future = useRef<Snap[]>([]);
+  const shownKey = useRef<string | null>(null);
+  const shownSnap = useRef<Snap>({ nodes, edges });
+  const lastEditAt = useRef(0);
+  const restoring = useRef(false);
+  const graphKey = useMemo(() => JSON.stringify(graphOf(nodes, edges)), [nodes, edges]);
+  useEffect(() => {
+    const now: Snap = { nodes, edges };
+    if (shownKey.current !== null && graphKey !== shownKey.current) {
+      if (restoring.current) {
+        restoring.current = false;
+      } else {
+        const t = Date.now();
+        if (t - lastEditAt.current > HISTORY_GROUP_MS) {
+          past.current.push(shownSnap.current);
+          if (past.current.length > HISTORY_LIMIT) past.current.shift();
+        }
+        lastEditAt.current = t;
+        future.current = [];
+      }
+    }
+    shownKey.current = graphKey;
+    shownSnap.current = now;
+    // Keyed on the graph's shape; nodes/edges are read for the snapshot only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphKey]);
+
+  const restore = useCallback((snap: Snap) => {
+    // Only flag it when the canvas will actually change — otherwise the flag
+    // would outlive this restore and swallow the next real edit.
+    restoring.current = JSON.stringify(graphOf(snap.nodes, snap.edges)) !== shownKey.current;
+    lastEditAt.current = 0; // the next edit starts a new undo step
+    setNodes(snap.nodes.map((n) => ({ ...n, selected: false })));
+    setEdges(snap.edges.map((e) => ({ ...e, selected: false })));
+    setSelectedId((s) => (s && snap.nodes.some((n) => n.id === s) ? s : null));
+    markDirty();
+  }, [markDirty]);
+  const undo = useCallback(() => {
+    const prev = past.current.pop();
+    if (!prev) {
+      toast.error("Nothing to undo");
+      return;
+    }
+    future.current.push(shownSnap.current);
+    restore(prev);
+  }, [restore, toast]);
+  const redo = useCallback(() => {
+    const next = future.current.pop();
+    if (!next) {
+      toast.error("Nothing to redo");
+      return;
+    }
+    past.current.push(shownSnap.current);
+    restore(next);
+  }, [restore, toast]);
+
   useEffect(() => {
     if (readOnly) return;
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey || isTyping(e.target)) return;
       const k = e.key.toLowerCase();
-      if (k === "c" && selectedSteps.length) {
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (k === "y" || (k === "z" && e.shiftKey)) {
+        e.preventDefault();
+        redo();
+      } else if (k === "x" && selectedSteps.length) {
+        if (window.getSelection()?.toString()) return;
+        e.preventDefault();
+        void cutSelected();
+      } else if (k === "c" && selectedSteps.length) {
         // Leave a normal text copy alone (text selected on the page).
         if (window.getSelection()?.toString()) return;
         e.preventDefault();
@@ -467,7 +571,7 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("paste", onPaste);
     };
-  }, [readOnly, selectedSteps.length, copySelected, pasteSteps, duplicateSelected]);
+  }, [readOnly, selectedSteps.length, copySelected, cutSelected, pasteSteps, duplicateSelected, undo, redo]);
 
   const snapshot = (): FlowGraph => graphOf(nodes, edges);
 
@@ -540,7 +644,7 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
             );
           })}
           <p className="text-[11.5px] text-gray-400 leading-relaxed px-1 pt-3">
-            Drag a step onto the canvas, or click it to add it in the middle — a clicked step connects to the selected step&apos;s first free output. Drag from an output dot to connect by hand; select a line and press Delete to remove it. Drag on empty space to select several steps (Ctrl+A selects all); scroll or right-drag to move around, Ctrl+scroll to zoom. Ctrl+C / Ctrl+V copies steps (also into another flow), Ctrl+D duplicates them.
+            Drag a step onto the canvas, or click it to add it in the middle — a clicked step connects to the selected step&apos;s first free output. Drag from an output dot to connect by hand; point at a line and click its scissors to cut it (or select it and press Delete). Drag on empty space to select several steps (Ctrl+A selects all); scroll or right-drag to move around, Ctrl+scroll to zoom. Ctrl+Z undoes, Ctrl+Y redoes. Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste steps (also into another flow), Ctrl+D duplicates them. To pass a patient to the team, connect a button to a <b>Hand to agent</b> step.
           </p>
         </aside>
       )}
@@ -555,11 +659,13 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
         }}
         onDrop={readOnly ? undefined : onDrop}
       >
+        <EdgeEditContext.Provider value={!readOnly}>
         <ReactFlow
           onInit={setRf}
           nodes={displayNodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodesChange={readOnly ? undefined : onNodesChange}
           onEdgesChange={readOnly ? undefined : onEdgesChange}
           onConnect={readOnly ? undefined : onConnect}
@@ -592,12 +698,41 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable className="!bg-white !border !border-gray-200 !rounded-lg" maskColor="rgba(0,0,0,0.04)" />
         </ReactFlow>
+        </EdgeEditContext.Provider>
 
         {!readOnly && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 rounded-xl border border-gray-200 bg-white/95 shadow-sm px-1.5 py-1">
+            <button
+              type="button"
+              onClick={undo}
+              title="Undo (Ctrl+Z)"
+              aria-label="Undo"
+              className="inline-flex items-center rounded-lg p-1.5 text-gray-700 hover:bg-gray-50"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={redo}
+              title="Redo (Ctrl+Y)"
+              aria-label="Redo"
+              className="inline-flex items-center rounded-lg p-1.5 text-gray-700 hover:bg-gray-50"
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+            <span className="w-px h-5 bg-gray-200 mx-1" aria-hidden />
             <span className="px-1.5 text-[11.5px] text-gray-400 whitespace-nowrap">
               {selectedSteps.length ? `${selectedSteps.length} selected` : "Drag on empty space to select"}
             </span>
+            <button
+              type="button"
+              onClick={() => void cutSelected()}
+              disabled={!selectedSteps.length}
+              title="Cut (Ctrl+X)"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <Scissors className="w-3.5 h-3.5" /> Cut
+            </button>
             <button
               type="button"
               onClick={() => void copySelected()}
