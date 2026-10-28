@@ -18,7 +18,8 @@ import {
   SelectionMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ClipboardPaste, Copy, CopyPlus, GripVertical, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, FlaskConical, GalleryHorizontal, Images, Redo2, Scissors, Undo2 } from "lucide-react";
+import { ClipboardPaste, Copy, CopyPlus, GripVertical, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, FlaskConical, GalleryHorizontal, Images, Redo2, Scissors, Undo2, Wand2 } from "lucide-react";
+import { tidyLayout } from "@/lib/flowLayout";
 import type { AssignableUser, FlowGraph, FlowNodeData, FlowNodeType, FlowValidationError, Template } from "@/types";
 import { ADDABLE_STEPS, STEP_META, defaultData, outputsOf, uid, validateFlow } from "@/lib/flows";
 import { readFlowFile, relinkTemplates } from "@/lib/flowTransfer";
@@ -445,6 +446,25 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
     placeClip(clip, { x: minX + 48, y: minY + 48 });
   }, [selectedSteps, clipOf, placeClip]);
 
+  // Tidy up (Shift+Alt+T, like n8n): lay every step out left to right by
+  // where it sits in the flow. One Ctrl+Z puts them back.
+  const tidyUp = useCallback(() => {
+    const pos = tidyLayout(
+      nodes.map((n) => ({
+        id: n.id,
+        isStart: n.type === "trigger",
+        width: n.measured?.width ?? NODE_W,
+        height: n.measured?.height ?? NODE_H,
+        y: n.position.y,
+        outputs: outputsOf(n.type, n.data).map(([h]) => h),
+      })),
+      edges.map((e) => ({ source: e.source, sourceHandle: e.sourceHandle || "next", target: e.target })),
+    );
+    setNodes((ns) => ns.map((n) => (pos[n.id] ? { ...n, position: pos[n.id] } : n)));
+    markDirty();
+    setTimeout(() => rf?.fitView({ duration: 300, padding: 0.15, maxZoom: 1 }), 50);
+  }, [nodes, edges, markDirty, rf]);
+
   // Cut (Ctrl+X): copy the selected steps, then remove them and their lines.
   const cutSelected = useCallback(async () => {
     if (!selectedSteps.length) {
@@ -531,6 +551,11 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
   useEffect(() => {
     if (readOnly) return;
     const onKey = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.altKey && !e.ctrlKey && !e.metaKey && e.code === "KeyT" && !isTyping(e.target)) {
+        e.preventDefault();
+        tidyUp();
+        return;
+      }
       if (!(e.ctrlKey || e.metaKey) || e.altKey || isTyping(e.target)) return;
       const k = e.key.toLowerCase();
       if (k === "z" && !e.shiftKey) {
@@ -571,7 +596,7 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("paste", onPaste);
     };
-  }, [readOnly, selectedSteps.length, copySelected, cutSelected, pasteSteps, duplicateSelected, undo, redo]);
+  }, [readOnly, selectedSteps.length, copySelected, cutSelected, pasteSteps, duplicateSelected, undo, redo, tidyUp]);
 
   const snapshot = (): FlowGraph => graphOf(nodes, edges);
 
@@ -644,7 +669,7 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
             );
           })}
           <p className="text-[11.5px] text-gray-400 leading-relaxed px-1 pt-3">
-            Drag a step onto the canvas, or click it to add it in the middle — a clicked step connects to the selected step&apos;s first free output. Drag from an output dot to connect by hand; point at a line and click its scissors to cut it (or select it and press Delete). Drag on empty space to select several steps (Ctrl+A selects all); scroll or right-drag to move around, Ctrl+scroll to zoom. Ctrl+Z undoes, Ctrl+Y redoes. Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste steps (also into another flow), Ctrl+D duplicates them. To pass a patient to the team, connect a button to a <b>Hand to agent</b> step.
+            Drag a step onto the canvas, or click it to add it in the middle — a clicked step connects to the selected step&apos;s first free output. Drag from an output dot to connect by hand; point at a line and click its scissors to cut it (or select it and press Delete). Drag on empty space to select several steps (Ctrl+A selects all); scroll or right-drag to move around, Ctrl+scroll to zoom. Ctrl+Z undoes, Ctrl+Y redoes. Tidy up (Shift+Alt+T) arranges every step. Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste steps (also into another flow), Ctrl+D duplicates them. To pass a patient to the team, connect a button to a <b>Hand to agent</b> step.
           </p>
         </aside>
       )}
@@ -719,6 +744,14 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
               className="inline-flex items-center rounded-lg p-1.5 text-gray-700 hover:bg-gray-50"
             >
               <Redo2 className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={tidyUp}
+              title="Tidy up — arrange every step (Shift+Alt+T)"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <Wand2 className="w-3.5 h-3.5" /> Tidy up
             </button>
             <span className="w-px h-5 bg-gray-200 mx-1" aria-hidden />
             <span className="px-1.5 text-[11.5px] text-gray-400 whitespace-nowrap">
