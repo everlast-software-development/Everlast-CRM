@@ -809,7 +809,15 @@ export interface FlowSummary {
 export interface Flow extends Omit<FlowSummary, "campaignCount"> {
   graph: FlowGraph;
   variables: string[];
+  /** Names of the templates and agents the steps point at, by id. */
+  names?: FlowNames;
   campaigns?: { id: number; name: string; status: CampaignStatus }[];
+}
+
+// For people who can't list templates or agents (a director viewing a flow).
+export interface FlowNames {
+  templates: Record<number, string>;
+  users: Record<number, string>;
 }
 
 export interface FlowRun {

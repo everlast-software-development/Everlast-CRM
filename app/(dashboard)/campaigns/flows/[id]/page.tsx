@@ -114,10 +114,16 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
   const lockedBy = flow?.campaigns?.find((c) => LOCKING_STATUSES.includes(c.status)) ?? null;
   // Admins may still edit a locked flow (they approve anyway; it's audited).
   const canWrite = can("campaign:write") && (!lockedBy || isAdmin);
-  // Read-only roles (supervisors) see how customers went through the flow,
-  // not the builder.
-  const responsesOnly = !can("campaign:write");
+  // Read-only roles: supervisors see how customers went through the flow, not
+  // the builder; a director (no flow:results) sees only the flow itself, as a
+  // read-only tree, with nothing about how it ran.
+  const viewOnly = !can("campaign:write");
+  const responsesOnly = viewOnly && can("flow:results");
+  const treeOnly = viewOnly && !responsesOnly;
   const view: Tab = responsesOnly ? "responses" : tab;
+  // Lists for the builder's pickers; without them the steps show names from the flow.
+  const canListTemplates = can("template:read");
+  const canListAgents = can("conversation:assign");
 
   useEffect(() => {
     if (!ready || !canRead) return;
@@ -126,16 +132,20 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
     // Pending (SUBMITTED) templates are included on purpose: a flow can be
     // built while Meta reviews its template. Nothing can trigger it early —
     // the campaign that sends the template still needs it APPROVED.
-    Promise.all([
-      apiGetTemplates({ status: "APPROVED", category: "CAMPAIGN" }),
-      apiGetTemplates({ status: "SUBMITTED", category: "CAMPAIGN" }),
-    ])
-      // Not-yet-set-up imported templates (needsSetup) can't be sent by a flow.
-      .then(([approved, pending]) => { if (!cancelled) setTemplates([...approved.data, ...pending.data].filter((t) => !t.needsSetup?.length)); })
-      .catch(() => {});
-    apiGetAssignableUsers()
-      .then((res) => { if (!cancelled) setAgents(res.data); })
-      .catch(() => {});
+    if (canListTemplates) {
+      Promise.all([
+        apiGetTemplates({ status: "APPROVED", category: "CAMPAIGN" }),
+        apiGetTemplates({ status: "SUBMITTED", category: "CAMPAIGN" }),
+      ])
+        // Not-yet-set-up imported templates (needsSetup) can't be sent by a flow.
+        .then(([approved, pending]) => { if (!cancelled) setTemplates([...approved.data, ...pending.data].filter((t) => !t.needsSetup?.length)); })
+        .catch(() => {});
+    }
+    if (canListAgents) {
+      apiGetAssignableUsers()
+        .then((res) => { if (!cancelled) setAgents(res.data); })
+        .catch(() => {});
+    }
     if (flowId) {
       apiGetFlow(flowId)
         .then((res) => {
@@ -149,7 +159,7 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
         .catch((err) => { if (!cancelled) setLoadError(err instanceof Error ? err.message : "Couldn't load the flow"); });
     }
     return () => { cancelled = true; };
-  }, [ready, canRead, flowId]);
+  }, [ready, canRead, canListTemplates, canListAgents, flowId]);
 
   // A backup left by an earlier visit (crash, closed tab) is offered once the
   // saved version has loaded (see the load above); a new flow checks on mount.
@@ -377,7 +387,7 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
   };
 
   if (!ready) return <PageSpinner />;
-  if (!canRead || (isNew && responsesOnly)) return <NoAccess what="flows" />;
+  if (!canRead || (isNew && viewOnly)) return <NoAccess what="flows" />;
   if (loadError) {
     return (
       <div className="p-8">
@@ -441,7 +451,7 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
-        {!responsesOnly && (
+        {!viewOnly && (
           <div className="inline-flex bg-gray-50 border border-gray-100 rounded-lg p-1 gap-1">
             {(["builder", "responses"] as const).map((t) => (
               <button
@@ -458,7 +468,7 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
         )}
 
         {/* The canvas as it is now, unsaved changes included. */}
-        {!responsesOnly && (
+        {!viewOnly && (
           <button
             type="button"
             onClick={() => {
@@ -519,7 +529,7 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      {lockedBy && (
+      {lockedBy && !treeOnly && (
         <div className="flex flex-wrap items-center gap-3 px-5 py-2.5 border-b border-amber-200 bg-amber-50 text-[13px] text-amber-800">
           <p className="flex-1 min-w-[240px]">
             {isAdmin
@@ -551,6 +561,8 @@ export default function FlowEditorPage({ params }: { params: Promise<{ id: strin
             templates={templates}
             agents={agents}
             readOnly={!canWrite}
+            arrangeOnOpen={treeOnly}
+            names={flow?.names}
             saving={saving}
             serverErrors={serverErrors}
             onSave={save}
