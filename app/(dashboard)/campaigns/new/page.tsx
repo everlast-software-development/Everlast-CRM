@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useRef, useCallback, type Dispatch, type SetStateAction } from "react";
+import { Suspense, useEffect, useMemo, useState, useRef, useCallback, type Dispatch, type SetStateAction } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, ArrowLeft, Loader2, Search, ChevronRight, ChevronLeft, Lock, Send, AlertCircle, ShieldCheck, Clock } from "lucide-react";
 import type { Template, Customer, Conversation, ContactList, Segment, CampaignCategory, CampaignCapacity } from "@/types";
@@ -29,6 +29,7 @@ import { isQuietAt, nextOpenAfter, formatClock, type QuietHours } from "@/lib/qu
 import { assessTier, type TierVerdict } from "@/lib/whatsappTiers";
 import { useToast } from "@/components/ui/toast";
 import { useActiveNumber } from "@/components/WhatsAppNumberProvider";
+import { isCustomerOptedOutOnLine } from "@/components/OptOut";
 import { describeRule } from "@/components/SegmentBuilder";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { CAMPAIGN_CATEGORIES, CAMPAIGN_CATEGORY_COLORS } from "@/lib/campaignCategories";
@@ -505,8 +506,12 @@ function Step2({
     return c.tags.includes(tagFilter);
   });
 
-  const filteredIds = filtered.map((c) => c.id as number).filter(Boolean);
-  const optedOut = customers.filter((c) => (c as Customer & { optedOut?: boolean }).optedOut).length;
+  // Opted out on this campaign's line (or do-not-contact): shown greyed out,
+  // never selectable — "select all" included.
+  const { activeNumberId } = useActiveNumber();
+  const isBlocked = (c: Customer) => isCustomerOptedOutOnLine(c, activeNumberId);
+  const filteredIds = filtered.filter((c) => !isBlocked(c)).map((c) => c.id as number).filter(Boolean);
+  const optedOut = customers.filter(isBlocked).length;
   const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
 
   const rate = costPerMsg(template);
@@ -670,7 +675,7 @@ function Step2({
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {filtered.map((c) => {
-                      const isOptedOut = (c as Customer & { optedOut?: boolean }).optedOut;
+                      const isOptedOut = isBlocked(c);
                       const id = c.id as number;
                       const conv = convMap.get(id);
                       return (
@@ -794,7 +799,7 @@ function Step2({
         {optedOut > 0 && (
           <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
             <p className="text-[12px] font-semibold text-amber-700">⚠ {optedOut} contact{optedOut > 1 ? "s" : ""} have opted out</p>
-            <p className="text-[11px] text-amber-600 mt-0.5">They'll be skipped automatically.</p>
+            <p className="text-[11px] text-amber-600 mt-0.5">They can&apos;t be added to a campaign on this line.</p>
           </div>
         )}
       </div>
@@ -1392,7 +1397,7 @@ function NewCampaignContent() {
   };
   // Recipients can be pre-seeded from the Customers page via ?recipients=1,2,3.
   // The draft flow (?draft=ID) owns selection itself, so it takes precedence.
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => {
+  const [pickedIds, setSelectedIds] = useState<Set<number>>(() => {
     const raw = searchParams.get("recipients");
     if (draftIdParam || !raw) return new Set();
     return new Set(
@@ -1400,12 +1405,22 @@ function NewCampaignContent() {
     );
   });
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const { registerSwitchGuard, activeNumberId } = useActiveNumber();
+  // The audience is what was picked minus anyone opted out on this line —
+  // however they got in (a row, select all, a list, a link from Customers, a
+  // draft). Everything below reads this, so an opted-out contact is never
+  // counted, costed or sent; the server drops them too.
+  const selectedIds = useMemo(() => {
+    const blocked = new Set(
+      customers.filter((c) => isCustomerOptedOutOnLine(c, activeNumberId)).map((c) => c.id as number),
+    );
+    return blocked.size ? new Set([...pickedIds].filter((id) => !blocked.has(id))) : pickedIds;
+  }, [pickedIds, customers, activeNumberId]);
 
   // Warn before a number switch discards this wizard. The audience here is
   // resolved against the active number and the template belongs to its WABA, so
   // switching mid-flow would otherwise build a campaign pairing one number's
   // recipients with another number's template.
-  const { registerSwitchGuard } = useActiveNumber();
   const wizardDirty = step > 1 || selectedIds.size > 0 || selectedTemplate !== null;
   useEffect(
     () =>

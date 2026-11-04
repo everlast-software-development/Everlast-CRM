@@ -41,6 +41,16 @@ export const isPatientsOwnOptOut = (source: string | null | undefined) =>
 
 export const isOptedOut = (s: OptOutState | null | undefined) => !!s && (s.all || !!s.line);
 
+/**
+ * A contact a campaign on this line must never reach: do-not-contact, or opted
+ * out of this line (a STOP, WhatsApp's own switch, the team). Same gates as the
+ * server's resolveAudience and send loop.
+ */
+export const isCustomerOptedOutOnLine = (
+  c: { optedOut?: boolean; optOuts?: { whatsappNumberId: number }[] },
+  lineId: string | number | null,
+) => !!c.optedOut || (lineId != null && !!c.optOuts?.some((o) => String(o.whatsappNumberId) === String(lineId)));
+
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 /**
@@ -111,8 +121,8 @@ export function useOptOutState(conversationId: string): OptOutState | null {
 // ── Banner ───────────────────────────────────────────────────────────────────
 
 /**
- * Under the chat header while the patient is opted out. Replying is fine; the
- * banner says so, and that offers / campaign templates are not.
+ * Under the chat header while the patient is opted out. Replying in the window
+ * is fine; marketing templates and campaigns are blocked, and the banner says so.
  */
 export function OptOutBanner({ conversationId, state }: { conversationId: string; state: OptOutState | null }) {
   const { can } = useCurrentUser();
@@ -132,7 +142,7 @@ export function OptOutBanner({ conversationId, state }: { conversationId: string
           {state.all && state.line
             ? `Also opted out on this line (${optOutSourceLabel(state.line.source)} · ${fmtDay(state.line.optedOutAt)}). `
             : ""}
-          You can still reply to their messages. Don&apos;t send offers or campaign templates.
+          You can still reply within 24 hours of their last message. Marketing templates and campaigns are blocked.
         </p>
       </div>
       {can("optout:lift") && (

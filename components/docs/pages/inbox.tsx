@@ -173,8 +173,8 @@ const windowPage: DocPage = {
       />
       <Shot name="chat-template-picker" alt="The template picker on a chat whose window has closed" />
       <Callout tone="warn" title="Opted-out patients">
-        Marketing templates are marked <b>Marketing</b> in the picker. If the patient opted out, you&apos;re asked to confirm (
-        <Ui>They asked for it. Send</Ui>), and the send is recorded in the audit log. See <DocLink to="opt-outs">Opt-outs</DocLink>.
+        If the patient opted out, marketing templates are hidden from the picker and can&apos;t be sent. Only an admin lifting the
+        opt-out changes that. See <DocLink to="opt-outs">Opt-outs</DocLink>.
       </Callout>
       <P>
         No approved template? Ask whoever manages templates to create and submit one. See <DocLink to="templates">WhatsApp templates</DocLink>.
@@ -327,7 +327,10 @@ const optOuts: DocPage = {
   visible: (ctx) => ctx.can("conversation:write") || ctx.can("contact:write"),
   body: (ctx) => (
     <>
-      <Lead>A patient who opted out doesn&apos;t receive campaigns or marketing templates. You can still reply to their messages.</Lead>
+      <Lead>
+        A patient who opted out never receives campaigns or marketing templates, with no exceptions. You can still reply within 24
+        hours of their last message, and send utility templates.
+      </Lead>
       <Shot name="chat-opted-out" alt="A chat with the opt-out banner" />
       <H>How a patient opts out or back in</H>
       <Table

@@ -245,7 +245,7 @@ const audit: DocPage = {
         items={[
           <>20 rows at a time; <Ui>Load more</Ui> for older ones. Hover <b>Details</b> to see everything recorded.</>,
           <>Type in <Ui>Filter by action...</Ui> to narrow it: for example <Code>auth.login</Code>, <Code>CAMPAIGN_APPROVED</Code>,{" "}
-            <Code>user.</Code>, <Code>TEMPLATE_SENT_TO_OPTED_OUT</Code>.</>,
+            <Code>user.</Code>, <Code>CUSTOMER_OPTED_OUT</Code>.</>,
           <>Phone numbers are masked to their last 4 digits.</>,
         ]}
       />

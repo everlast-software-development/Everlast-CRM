@@ -1213,9 +1213,9 @@ export function apiCreateConversation(customerId: number) {
 export function apiSendTemplate(
   conversationId: string,
   templateId: number,
-  // confirmOptedOut: send a marketing template to a patient who opted out —
-  // the first try answers 409 OPTED_OUT (details.scope "line" | "all").
-  opts: { clientMessageId?: string; confirmOtherOwner?: boolean; confirmOptedOut?: boolean } = {},
+  // A marketing template to a patient who opted out is always refused:
+  // 409 OPTED_OUT (details.scope "line" | "all").
+  opts: { clientMessageId?: string; confirmOtherOwner?: boolean } = {},
 ) {
   return apiFetch<{ success: boolean; data: import("@/types").Message }>(
     `/api/templates/conversations/${conversationId}/send-template`,
