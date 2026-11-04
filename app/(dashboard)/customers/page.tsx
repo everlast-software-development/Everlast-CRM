@@ -354,7 +354,7 @@ function CustomerDetailDrawer({ customer, conv, onClose, onSaved, onDeleted }: D
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[16px] font-bold text-gray-900 truncate">
+                        <p className="bidi-line text-[16px] font-bold text-gray-900 truncate">
                           {c.name || <span className="text-gray-400 font-normal text-[14px]">No name</span>}
                         </p>
                         <PencilBtn field="name" />
@@ -585,13 +585,13 @@ function CustomerDetailDrawer({ customer, conv, onClose, onSaved, onDeleted }: D
                         onKeyDown={(e) => { if (e.key === "Escape") cancelEdit(); }}
                         rows={4}
                         placeholder="Add notes…"
-                        className="w-full text-[13.5px] text-gray-800 border border-brand rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand/20 resize-none placeholder:text-gray-300"
+                        className="bidi w-full text-[13.5px] text-gray-800 border border-brand rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand/20 resize-none placeholder:text-gray-300"
                       />
                       <EditActions />
                     </div>
                   ) : (
                     c.notes
-                      ? <p className="text-[13.5px] text-gray-700 leading-relaxed whitespace-pre-wrap">{c.notes}</p>
+                      ? <p className="bidi text-[13.5px] text-gray-700 leading-relaxed whitespace-pre-wrap">{c.notes}</p>
                       : <p className="text-[13px] text-gray-300">—</p>
                   )}
                 </div>
@@ -1102,7 +1102,7 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Send Template</p>
-              <p className="text-[16px] font-bold text-gray-900 truncate">
+              <p className="bidi-line text-[16px] font-bold text-gray-900 truncate">
                 {customer?.name || customer?.phone || "Contact"}
               </p>
             </div>

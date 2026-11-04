@@ -489,3 +489,18 @@ body {
   inset: -8px;
   border-radius: 9999px;
 }
+
+/* Text people write (messages, names, notes) can be Arabic or English, often
+   mixed. Each line takes its direction from its first letter, as WhatsApp
+   does: Arabic lines read right-to-left and sit on the right.
+   - bidi: paragraphs, message bubbles, text boxes.
+   - bidi-line: one-line names and previews. They stay on the left with the
+     rest of the column, but a cut-off Arabic line still shows how it starts. */
+@utility bidi {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+@utility bidi-line {
+  unicode-bidi: plaintext;
+  text-align: left;
+}
