@@ -91,6 +91,8 @@ const CATEGORY_CONFIG: Record<
     text: "text-orange-700",
   },
   CAMPAIGN: { label: "Campaign", bg: "bg-purple-50", text: "text-purple-700" },
+  // Made by supervisors on the Patient messages page.
+  UTILITY: { label: "Patient care", bg: "bg-sky-50", text: "text-sky-700" },
 };
 
 function TemplateStatusBadge({ status }: { status: TemplateStatus }) {

@@ -661,6 +661,23 @@ export function apiUpdateTemplate(
   });
 }
 
+// ── Patient messages page: patient-care (UTILITY) templates ──────────────────
+export function apiGetUtilityTemplates() {
+  return apiFetch<import("@/types").TemplateListResponse>("/api/templates/utility");
+}
+export function apiCreateUtilityTemplate(data: { name: string; body: string; footer?: string | null }) {
+  return apiFetch<import("@/types").TemplateResponse>("/api/templates/utility", { method: "POST", body: JSON.stringify(data) });
+}
+export function apiUpdateUtilityTemplate(id: number, data: { name?: string; body?: string; footer?: string | null }) {
+  return apiFetch<import("@/types").TemplateResponse>(`/api/templates/utility/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+export function apiSubmitUtilityTemplate(id: number) {
+  return apiFetch<import("@/types").TemplateResponse>(`/api/templates/utility/${id}/submit`, { method: "POST" });
+}
+export function apiDeleteUtilityTemplate(id: number) {
+  return apiFetch<{ success: boolean }>(`/api/templates/utility/${id}`, { method: "DELETE" });
+}
+
 export function apiDeleteTemplate(id: number) {
   return apiFetch<{ success: boolean }>(`/api/templates/${id}`, { method: "DELETE" });
 }
@@ -1214,8 +1231,9 @@ export function apiSendTemplate(
   conversationId: string,
   templateId: number,
   // A marketing template to a patient who opted out is always refused:
-  // 409 OPTED_OUT (details.scope "line" | "all").
-  opts: { clientMessageId?: string; confirmOtherOwner?: boolean } = {},
+  // 409 OPTED_OUT (details.scope "line" | "all"). fields: what the agent typed
+  // for the template's blanks ({ date, time… }).
+  opts: { clientMessageId?: string; confirmOtherOwner?: boolean; fields?: Record<string, string> } = {},
 ) {
   return apiFetch<{ success: boolean; data: import("@/types").Message }>(
     `/api/templates/conversations/${conversationId}/send-template`,

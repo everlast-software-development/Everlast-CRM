@@ -18,13 +18,13 @@ import type { Permission } from "@/lib/permissions";
 // open a specific one, and a reload stays where you were. `wide` sections hold
 // tables; the rest are forms and get a narrower centred column. `perm` is what
 // a tab needs (null: everyone who reaches Settings); supervisors reach Settings
-// for Saved replies alone, so they see just that tab and My account.
+// for My account alone — their saved replies are on Patient Messages.
 const TABS = [
   { key: "users", label: "Users", group: "Workspace", icon: Users, wide: true, perm: "user:write", description: "Who can sign in, their roles and what they can access" },
   { key: "numbers", label: "WhatsApp numbers", group: "Workspace", icon: Smartphone, wide: true, perm: "number:write", description: "The WhatsApp lines the team sends and receives on" },
   { key: "quiet-hours", label: "Quiet hours", group: "Messaging", icon: MoonStar, wide: false, perm: "settings:write", description: "When campaign messages are held back" },
   { key: "campaign-safety", label: "Campaign safety", group: "Messaging", icon: ShieldCheck, wide: false, perm: "settings:write", description: "Limits that protect patients and the number's quality" },
-  { key: "saved-replies", label: "Saved replies", group: "Messaging", icon: MessageSquareText, wide: true, perm: "saved_reply:write", description: "Ready-made answers agents insert by typing /" },
+  { key: "saved-replies", label: "Saved replies", group: "Messaging", icon: MessageSquareText, wide: true, perm: "settings:write", description: "Ready-made answers agents insert by typing /" },
   { key: "account", label: "My account", group: "Personal", icon: UserRound, wide: false, perm: null, description: "Your profile and password" },
 ] as const satisfies readonly { key: string; label: string; group: string; icon: LucideIcon; wide: boolean; perm: Permission | null; description: string }[];
 

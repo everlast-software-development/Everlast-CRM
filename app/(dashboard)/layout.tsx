@@ -25,6 +25,7 @@ import {
   Workflow,
   Pin,
   Wallet,
+  MessagesSquare,
 } from "lucide-react";
 import { getSocket, disconnectSocket } from "@/lib/socket";
 import { apiLogout, apiGetLineCounts, apiGetPendingApprovals, apiGetErrorSummary } from "@/lib/api";
@@ -314,14 +315,17 @@ function DashboardShell({ children }: { children: ReactNode }) {
     // admins reach it from a tab on the Dashboard.
     { href: can("stats:marketing") && !can("stats:team") ? "/dashboard/marketing" : "/dashboard", icon: LayoutDashboard, label: "Dashboard", perm: "stats:read" as const },
     { href: "/templates", icon: LayoutTemplate,  label: "Templates",     perm: "template:write" as const, badge: templateUpdates > 0 ? templateUpdates : undefined },
+    // Supervisors' patient-care templates and saved replies (admins too).
+    { href: "/patient-messages", icon: MessagesSquare, label: "Patient Messages", perm: can("template:write_utility") ? "template:write_utility" as const : "saved_reply:write" as const },
     { href: "/media-library", icon: Images,      label: "Media Library", perm: "media:write" as const },
     { href: "/number-health", icon: ShieldCheck, label: "Number Health", perm: "stats:read" as const },
     // What WhatsApp is costing per line this month: admins and directors.
     { href: "/spending",     icon: Wallet,      label: "Spending",      perm: "stats:spend" as const },
     { href: recentErrors > 0 ? "/audit?tab=errors" : "/audit", icon: ClipboardList, label: "Audit Log", perm: "audit:read" as const, badge: recentErrors > 0 ? recentErrors : undefined },
     // Users, WhatsApp numbers, quiet hours, campaign safety, saved replies, my
-    // account. Admins get it all; supervisors get it for Saved replies alone.
-    // Team & Access lives here now (/team redirects).
+    // account. Admins get it all; supervisors get My account (their saved
+    // replies are on Patient Messages). Team & Access lives here now (/team
+    // redirects).
     { href: "/settings",  icon: Settings,        label: "Settings",      perm: can("settings:write") ? "settings:write" as const : "saved_reply:write" as const },
   ].filter((i) => can(i.perm));
 

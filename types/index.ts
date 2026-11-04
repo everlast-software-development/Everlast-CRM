@@ -280,7 +280,8 @@ export type TemplateStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "
 // "variables" = {{1}}-style placeholders nobody has said the meaning of;
 // "media" = only Meta's (expiring) sample file for the header or cards.
 export type TemplateSetupNeed = "variables" | "media";
-export type TemplateCategory = "GENERAL" | "RE_ENGAGEMENT" | "CAMPAIGN";
+// UTILITY: patient-care templates from the Patient messages page (never marketing).
+export type TemplateCategory = "GENERAL" | "RE_ENGAGEMENT" | "CAMPAIGN" | "UTILITY";
 export type TemplateHeaderType = "NONE" | "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
 export type TemplateButtonType = "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE";
 
@@ -318,6 +319,17 @@ export interface Template {
   updatedAt: string;
   // Computed by GET /api/templates; non-empty = can't be sent yet.
   needsSetup?: TemplateSetupNeed[];
+  // Meta's own category (MARKETING / UTILITY / AUTHENTICATION), once known.
+  metaCategory?: string | null;
+  // Blanks the agent types when sending ({{date}}, {{time}}…), in order.
+  fillIns?: TemplateFillIn[];
+  // Patient messages page: Meta re-classified this care message as marketing.
+  classedMarketing?: boolean;
+}
+
+export interface TemplateFillIn {
+  key: string;
+  label: string;
 }
 
 export interface TemplateImportResult {

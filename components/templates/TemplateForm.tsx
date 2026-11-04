@@ -208,7 +208,8 @@ export default function TemplateForm({
   }
 
   const countOf = (type: TemplateButtonType) => buttons.filter((b) => b.type === type).length;
-  const isGeneral = category === "GENERAL";
+  // Not marketing: no offer code, no carousel (UTILITY = Patient messages page).
+  const isGeneral = category === "GENERAL" || category === "UTILITY";
   // Why a button kind can't be added right now, or null when it can.
   function addBlocked(type: TemplateButtonType): string | null {
     if (buttons.length >= BUTTON_LIMITS.total) return `Maximum ${BUTTON_LIMITS.total} buttons`;
@@ -302,7 +303,7 @@ export default function TemplateForm({
     if (!name.trim() || !body.trim()) return "Name and body are required.";
     if (body.length > LIMITS.body) return `Body must be ≤ ${LIMITS.body} characters.`;
     if (isCarousel) {
-      if (category === "GENERAL") return "A carousel is a marketing template — choose Campaign or Re-engagement.";
+      if (isGeneral) return "A carousel is a marketing template — choose Campaign or Re-engagement.";
       return carouselError(cards);
     }
     if (footer.length > LIMITS.footer) return `Footer must be ≤ ${LIMITS.footer} characters.`;
@@ -449,6 +450,7 @@ export default function TemplateForm({
                 >
                   {/* The CRM name, then the category Meta bills and reviews it under. */}
                   <option value="GENERAL" disabled={isCarousel}>General · Utility{isCarousel ? " (not for carousels)" : ""}</option>
+                  <option value="UTILITY" disabled={isCarousel}>Patient care · Utility{isCarousel ? " (not for carousels)" : ""}</option>
                   <option value="RE_ENGAGEMENT">Re-engagement · Marketing</option>
                   <option value="CAMPAIGN">Campaign · Marketing</option>
                 </select>
@@ -482,7 +484,7 @@ export default function TemplateForm({
                     onClick={() => {
                       setFormat(value);
                       setError(null);
-                      if (value === "CAROUSEL" && category === "GENERAL") setCategory("CAMPAIGN");
+                      if (value === "CAROUSEL" && isGeneral) setCategory("CAMPAIGN");
                     }}
                     className={`text-left px-3 py-2 rounded-lg border transition-colors cursor-pointer ${format === value ? "border-brand bg-brand-100" : "border-gray-200 hover:bg-gray-50"}`}
                   >
