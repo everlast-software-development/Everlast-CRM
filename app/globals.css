@@ -28,6 +28,33 @@
   --color-wall-ink: #0f1d16;
 }
 
+/* The components/ui kit (media player, button, select, slider...) colours
+   itself with bg-primary / bg-background / text-muted-foreground. Those
+   utilities only exist while mapped here — without this block the voice
+   message player loses its background and its progress bar. The values are
+   the --background... variables below, which the `.dark` block re-points. */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+}
+
 /* Tailwind 4 gives buttons the plain arrow cursor. Everything clickable gets
    the hand; disabled controls say "not allowed". Classes like cursor-grab or
    cursor-default on an element still win (utilities beat this base layer). */
