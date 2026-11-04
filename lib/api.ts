@@ -331,13 +331,29 @@ export function apiDeleteMediaAsset(id: number) {
 
 // `seen`: the owner this screen showed. If someone changed it since, the
 // server refuses (409 ASSIGNMENT_CHANGED) instead of silently overwriting.
-export function apiAssignConversation(conversationId: string, agentId: number | null, seen?: { agentId: number | null }) {
+// confirmTakeover: yes, take over an away colleague's chat (the server asks
+// first with TAKEOVER_CONFIRM).
+export function apiAssignConversation(
+  conversationId: string,
+  agentId: number | null,
+  seen?: { agentId: number | null },
+  opts: { confirmTakeover?: boolean } = {},
+) {
   return apiFetch<{ success: boolean }>(
     `/api/conversations/${conversationId}/assign`,
     {
       method: "PUT",
-      body: JSON.stringify({ agentId, ...(seen ? { expectedAgentId: seen.agentId } : {}) }),
+      body: JSON.stringify({ agentId, ...(seen ? { expectedAgentId: seen.agentId } : {}), ...(opts.confirmTakeover ? { confirmTakeover: true } : {}) }),
     }
+  );
+}
+
+/** Who opened this chat while it was a colleague's (supervisors and admins). */
+export function apiGetSeenBy(conversationId: number | string) {
+  return apiFetch<{ success: boolean; data: import("@/types").ChatSeenBy[] }>(
+    `/api/supervision/conversations/${conversationId}/seen-by`,
+    {},
+    { numberScoped: false },
   );
 }
 

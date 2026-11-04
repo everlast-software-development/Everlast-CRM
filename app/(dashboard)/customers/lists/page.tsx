@@ -7,12 +7,14 @@ import { apiGetLists, apiCreateList, apiAddListMembers, apiDeleteList, ApiError 
 import ContactPicker from "@/components/ContactPicker";
 import type { ContactList } from "@/types";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
+import { NoAccess } from "@/components/NoAccess";
+import { PageSpinner } from "@/components/ui/spinner";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-export default function ContactListsPage() {
+function ContactLists() {
   // Viewing lists is list:read; creating, editing, importing into and deleting
   // them is list:write; starting a campaign from one needs campaign rights.
   const { can } = useCurrentUser();
@@ -352,4 +354,13 @@ export default function ContactListsPage() {
       )}
     </div>
   );
+}
+
+// Not in the menu without list:read; a typed-in address gets a clear answer
+// instead of a page of server errors.
+export default function ContactListsPage() {
+  const { ready, can: holds } = useCurrentUser();
+  if (!ready) return <PageSpinner />;
+  if (!holds("list:read")) return <NoAccess what="lists" />;
+  return <ContactLists />;
 }

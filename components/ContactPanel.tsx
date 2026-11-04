@@ -11,8 +11,9 @@ import Link from "next/link";
 import {
   X, Search, Pencil, Check, Copy, StickyNote, Tag, Image as ImageIcon, FileText, Link2,
   Megaphone, ShieldOff, Video, Music, Loader2, ArrowLeft, ExternalLink,
-  CalendarClock, Hourglass, MessageSquareText, Lock, Trash2,
+  CalendarClock, Hourglass, MessageSquareText, Lock, Trash2, Eye,
 } from "lucide-react";
+import { SeenBy } from "@/components/SeenBy";
 import {
   apiAddConversationNote, apiDeleteConversationNote, apiGetConversationProfile,
   apiSearchMessages, apiUpdateCustomer,
@@ -591,6 +592,16 @@ export function ContactPanel({
             </ul>
           )}
         </Section>
+
+        {/* Supervisors and admins: who opened this chat while it was a colleague's. */}
+        <SeenBy
+          conversationId={conversationId}
+          render={(list, count) => (
+            <Section icon={Eye} title="Seen by" aside={count ? <span className="text-[11px] text-gray-400">{count}</span> : undefined}>
+              {list}
+            </Section>
+          )}
+        />
       </div>
 
       {optOutDialog === "record" && (

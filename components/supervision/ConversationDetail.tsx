@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Bot,
   ExternalLink,
+  Eye,
   FileText,
   History,
   Image as ImageIcon,
@@ -23,6 +24,7 @@ import {
 import { apiAddConversationNote, apiGetSupervisionTimeline, getActiveNumber } from "@/lib/api";
 import type { SupervisionFlowState, SupervisionTimeline } from "@/types";
 import { AssigneePicker } from "@/components/AssigneePicker";
+import { SeenBy } from "@/components/SeenBy";
 import { useActiveNumber } from "@/components/WhatsAppNumberProvider";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { useToast } from "@/components/ui/toast";
@@ -299,6 +301,10 @@ function describeHistory(h: SupervisionTimeline["history"][number]): string {
       const to = str(d.agentUsername);
       const from = str(d.previousAgentUsername);
       if (!to) return from ? `unassigned it from ${from}` : "unassigned it";
+      if (d.takeover === true && from) {
+        const away = d.previousAgentStatus === "ON_BREAK" ? "on a break" : "offline";
+        return `took it over from ${from} (${away})`;
+      }
       return from ? `reassigned it from ${from} to ${to}` : `assigned it to ${to}`;
     }
     case "conversation.claimed":
@@ -696,6 +702,15 @@ export function ConversationDetail({
               </ul>
             )}
           </Section>
+
+          <SeenBy
+            conversationId={data.id}
+            render={(list, count) => (
+              <Section icon={<Eye className="w-4 h-4" />} title="Seen by" aside={count ? <span className="text-[11px] text-gray-400">{count}</span> : undefined}>
+                {list}
+              </Section>
+            )}
+          />
         </div>
       </div>
     </div>

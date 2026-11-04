@@ -37,17 +37,24 @@ export function ConversationOutcomeControl({
   outcome,
   followUpAt,
   optOut = null,
+  owner = null,
 }: {
   conversationId: string;
   outcome: ConversationOutcome | null;
   followUpAt: string | null;
   /** The patient's marketing opt-out (see components/OptOut), for the Marketing items. */
   optOut?: OptOutState | null;
+  /** Who owns the chat: only they (or a supervisor) change its follow-up. */
+  owner?: { id: number; name?: string | null; username: string } | null;
 }) {
-  const { can } = useCurrentUser();
+  const { me, can } = useCurrentUser();
   const canLift = can("optout:lift");
   const toast = useToast();
   const editable = can("conversation:write");
+  // A colleague's chat: the follow-up is theirs (server rule NOT_YOUR_CHAT).
+  // Recording an opt-out stays open to anyone working the chat.
+  const followUpLocked = !!owner && owner.id !== me?.id && !can("team:supervise");
+  const ownerName = owner ? owner.name || owner.username : "";
   const numericId = Number(conversationId);
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<"follow_up" | "opt_out" | "lift_opt_out" | null>(null);
@@ -164,10 +171,17 @@ export function ConversationOutcomeControl({
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
           <div role="menu" aria-label="Follow-up and marketing" className="absolute right-0 top-10 z-[61] w-[220px] bg-white border border-gray-100 rounded-xl shadow-lg py-1.5">
-            <button type="button" role="menuitem" onClick={() => { setOpen(false); setDialog("follow_up"); }} className={`${item} text-gray-700 hover:bg-gray-50`}>
-              <CalendarClock className="w-4 h-4 text-amber-600" /> <span className="flex-1">{shownOutcome ? "Change follow-up…" : "Follow up…"}</span>
-            </button>
-            {shownOutcome && (
+            {followUpLocked ? (
+              <p className="px-3 py-2 text-[12px] text-gray-500 leading-snug">
+                <CalendarClock className="w-4 h-4 text-gray-300 inline -mt-0.5 mr-1.5" />
+                The follow-up is {ownerName}&apos;s to set. Take the chat over to change it.
+              </p>
+            ) : (
+              <button type="button" role="menuitem" onClick={() => { setOpen(false); setDialog("follow_up"); }} className={`${item} text-gray-700 hover:bg-gray-50`}>
+                <CalendarClock className="w-4 h-4 text-amber-600" /> <span className="flex-1">{shownOutcome ? "Change follow-up…" : "Follow up…"}</span>
+              </button>
+            )}
+            {shownOutcome && !followUpLocked && (
               <button type="button" role="menuitem" onClick={() => quick({ outcome: null }, "Follow-up cancelled")} className={`${item} text-gray-500 hover:bg-gray-50`}>
                 <CalendarX className="w-4 h-4" /> <span className="flex-1">Cancel follow-up</span>
               </button>
