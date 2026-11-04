@@ -24,6 +24,7 @@ import {
   BookMarked,
   Workflow,
   Pin,
+  Wallet,
 } from "lucide-react";
 import { getSocket, disconnectSocket } from "@/lib/socket";
 import { apiLogout, apiGetLineCounts, apiGetPendingApprovals, apiGetErrorSummary } from "@/lib/api";
@@ -314,6 +315,8 @@ function DashboardShell({ children }: { children: ReactNode }) {
     { href: "/templates", icon: LayoutTemplate,  label: "Templates",     perm: "template:write" as const, badge: templateUpdates > 0 ? templateUpdates : undefined },
     { href: "/media-library", icon: Images,      label: "Media Library", perm: "media:write" as const },
     { href: "/number-health", icon: ShieldCheck, label: "Number Health", perm: "stats:read" as const },
+    // What WhatsApp is costing per line this month: admins and directors.
+    { href: "/spending",     icon: Wallet,      label: "Spending",      perm: "stats:spend" as const },
     { href: recentErrors > 0 ? "/audit?tab=errors" : "/audit", icon: ClipboardList, label: "Audit Log", perm: "audit:read" as const, badge: recentErrors > 0 ? recentErrors : undefined },
     // Users, WhatsApp numbers, quiet hours, campaign safety, my account.
     // Admin only; Team & Access lives here now (/team redirects).

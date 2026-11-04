@@ -111,6 +111,7 @@ const NAV: NavRow[] = [
   { label: "Templates", perm: "template:write", what: "WhatsApp message templates and their Meta approval status." },
   { label: "Media Library", perm: "media:write", what: "Images, video and documents for templates, flows and campaigns." },
   { label: "Number Health", perm: "stats:read", what: "The line's quality rating and messaging limit from Meta." },
+  { label: "Spending", perm: "stats:spend", what: "What WhatsApp is costing per line this month: free replies left out of 1,000, charged messages, estimated spend." },
   { label: "Audit Log", perm: "audit:read", what: "Who did what, and when." },
   { label: "Settings", perm: "settings:write", what: "Users, WhatsApp lines, quiet hours, campaign safety." },
 ];

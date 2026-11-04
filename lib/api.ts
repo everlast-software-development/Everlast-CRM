@@ -1115,6 +1115,15 @@ export function apiGetCampaignsReport(params: ReportQuery) {
 }
 
 /** The Marketing dashboard: campaign funnel, flows, audience, line health, what needs attention. */
+/** WhatsApp spend per line for a month ("2026-11"; omitted = this month). */
+export function apiGetSpending(month?: string) {
+  return apiFetch<{ success: boolean; data: import("@/types").SpendingReport }>(
+    `/api/stats/spending${month ? `?month=${encodeURIComponent(month)}` : ""}`,
+    {},
+    { numberScoped: false },
+  );
+}
+
 export function apiGetMarketingStats(params: ReportQuery) {
   return apiFetch<{ success: boolean; data: import("@/types").MarketingStats }>(`/api/stats/marketing?${reportQuery(params)}`, {}, { numberScoped: false });
 }

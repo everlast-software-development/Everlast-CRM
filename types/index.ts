@@ -1465,6 +1465,47 @@ export interface MarketingStats {
   attention: MarketingAttention;
 }
 
+// ── WhatsApp spend (GET /api/stats/spending) ────────────────────────────────
+export type SpendCategory = "service" | "utility" | "marketing" | "authentication";
+export interface SpendCategoryTotals {
+  delivered: number;
+  charged: number;
+  free: number;
+  costUsd: number;
+}
+export interface SpendBucket {
+  delivered: number;
+  costUsd: number;
+  /** Delivered, but Meta hasn't said what kind of message it was yet. */
+  unpriced: number;
+  /** Charged, but no rate is set for that country. */
+  noRate: number;
+  byCategory: Record<SpendCategory, SpendCategoryTotals>;
+  serviceByAgent: number;
+  serviceByFlow: number;
+}
+export interface SpendingLine extends SpendBucket {
+  id: number;
+  label: string;
+  phone: string | null;
+  isActive: boolean;
+  isDefault: boolean;
+  freeServiceUsed: number;
+  freeServiceLeft: number;
+}
+export interface SpendingReport {
+  month: string;
+  from: string;
+  to: string;
+  timeZone: string;
+  isCurrentMonth: boolean;
+  freeServicePerLine: number;
+  rates: Record<string, Partial<Record<SpendCategory, number>>>;
+  total: SpendBucket & { projectedUsd: number; awaitingDelivery: number };
+  lines: SpendingLine[];
+  daily: { date: string; delivered: number; costUsd: number }[];
+}
+
 // ── Who is looking at a chat ────────────────────────────────────────────────
 /** Someone with the chat open right now (socket "conversation.viewers"). */
 export interface ChatViewer {

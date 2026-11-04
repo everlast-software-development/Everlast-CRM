@@ -26,7 +26,7 @@ export type Permission =
   | "campaign:read" | "campaign:write" | "campaign:send" | "campaign:control"
   | "media:upload" | "media:read" | "media:write"
   | "user:read" | "user:write"
-  | "stats:read" | "stats:team" | "stats:marketing" | "audit:read" | "clinic:read"
+  | "stats:read" | "stats:team" | "stats:marketing" | "stats:spend" | "audit:read" | "clinic:read"
   | "number:read" | "number:use_any" | "number:write"
   | "settings:write"
   | "team:supervise"
