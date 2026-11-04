@@ -30,6 +30,7 @@ import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import { activeOutcome } from "@/lib/chatOutcome";
+import { isUnsupportedMessage, parseLocationMessage, UNSUPPORTED_LABEL } from "@/lib/specialMessages";
 import { NumberChip, OutcomeChip, StatusChip, WaitChip } from "./chips";
 import {
   WAIT_WARN_MINUTES,
@@ -125,6 +126,17 @@ function BubbleBody({ m }: { m: Message }) {
     );
   }
   if (!m.content) return <span className="text-[13px] italic text-gray-400">[{type.toLowerCase()}]</span>;
+  if (isUnsupportedMessage(m.content)) {
+    return <span className="text-[13px] italic text-gray-500">⚠️ {UNSUPPORTED_LABEL} (WhatsApp didn&apos;t share it)</span>;
+  }
+  const location = parseLocationMessage(m.content);
+  if (location) {
+    return (
+      <a href={location.url!} target="_blank" rel="noreferrer" className="text-[13px] underline decoration-gray-300 hover:text-brand-fg">
+        📍 {location.name}{location.address ? ` · ${location.address}` : ""}
+      </a>
+    );
+  }
   return <p className="text-[13px] leading-snug whitespace-pre-wrap break-words text-[#1F2A24]">{m.content}</p>;
 }
 

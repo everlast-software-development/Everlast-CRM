@@ -1,6 +1,7 @@
 // Formatting shared by the Supervision page's pieces.
 
 import type { PersonRef } from "@/types";
+import { isUnsupportedMessage, UNSUPPORTED_LABEL } from "@/lib/specialMessages";
 
 /** Waiting amber from this many working minutes; red from the SLA. */
 export const WAIT_WARN_MINUTES = 15;
@@ -142,6 +143,7 @@ export function messagePreview(m: { messageType?: string | null; content: string
   const structured = parseStructured(m.content);
   if (structured?.body) return structured.body;
   if (MEDIA_LABEL[type]) return MEDIA_LABEL[type];
+  if (isUnsupportedMessage(m.content)) return UNSUPPORTED_LABEL;
   if (type === "TEXT" || !m.messageType) return m.content || "";
   return m.content && !m.content.startsWith("http") ? m.content : `[${type.toLowerCase()}]`;
 }

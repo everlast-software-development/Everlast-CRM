@@ -25,7 +25,10 @@ import {
   ShieldOff,
   Copy,
   MessageSquareText,
+  MapPin,
+  AlertTriangle,
 } from "lucide-react";
+import { isUnsupportedMessage, parseLocationMessage, UNSUPPORTED_LABEL } from "@/lib/specialMessages";
 import {
   useMessages,
   emitTypingStart,
@@ -149,7 +152,7 @@ const EmojiPicker = lazy(() =>
 // replies to a campaign quote the template, and that is the message a reader
 // most needs to recognise.
 function messagePreview(m: { messageType: string; content: string }): string {
-  if (m.messageType === "TEXT") return m.content;
+  if (m.messageType === "TEXT") return isUnsupportedMessage(m.content) ? UNSUPPORTED_LABEL : m.content;
   if (m.messageType === "TEMPLATE" || m.messageType === "INTERACTIVE") {
     const tpl = parseTemplateContent(m.content);
     if (tpl?.body) return tpl.body;
@@ -585,6 +588,42 @@ function MessageContent({ msg, isAgent }: { msg: Message; isAgent: boolean }) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={directSrc} alt="sticker" className="w-40 h-40 object-contain" />
+    );
+  }
+
+  // WhatsApp withheld this one (poll, view-once photo, video note...) — tell the
+  // agent what to do instead of showing a raw placeholder.
+  if (isUnsupportedMessage(msg.content)) {
+    return (
+      <div className="flex items-start gap-2 max-w-[280px]">
+        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+        <div className="text-[13px] leading-snug">
+          <p className="font-semibold text-[#1F2A24]">{UNSUPPORTED_LABEL}</p>
+          <p className="text-gray-500 mt-0.5">
+            The customer sent something WhatsApp doesn&apos;t share with business apps, like a poll, a view-once
+            photo or a video note. Ask them to send it again as a normal message or photo.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const location = parseLocationMessage(msg.content);
+  if (location) {
+    return (
+      <a
+        href={location.url!}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-start gap-2 max-w-[280px] rounded-lg bg-black/5 dark:bg-black/25 px-2.5 py-2 hover:bg-black/10 transition-colors"
+      >
+        <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-red-500" />
+        <span className="min-w-0 text-[13px] leading-snug">
+          <span className="block font-semibold text-[#1F2A24] break-words">{location.name}</span>
+          {location.address && <span className="block text-gray-500 break-words">{location.address}</span>}
+          <span className="block text-brand-fg mt-0.5">Open in Google Maps</span>
+        </span>
+      </a>
     );
   }
 
