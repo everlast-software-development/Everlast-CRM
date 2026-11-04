@@ -33,6 +33,7 @@ import { WhatsAppNumberProvider, useActiveNumber } from "@/components/WhatsAppNu
 import { NumberSwitcher } from "@/components/NumberSwitcher";
 import { ThemeSwitcher, ThemeToggleButton } from "@/components/ThemeToggle";
 import { CurrentUserProvider, useCurrentUser } from "@/components/CurrentUserProvider";
+import { SEGMENTS_ENABLED } from "@/lib/features";
 import { ToastProvider } from "@/components/ui/toast";
 import DevCostTracker from "@/components/DevCostTracker";
 import TemplateStatusWatcher from "@/components/TemplateStatusWatcher";
@@ -482,7 +483,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
                 Lists
               </Link>
             )}
-            {can("segment:read") && (
+            {SEGMENTS_ENABLED && can("segment:read") && (
               <Link
                 href="/customers/segments"
                 className={`relative flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[13px] transition-colors ${
@@ -540,7 +541,7 @@ function DashboardShell({ children }: { children: ReactNode }) {
               Lists
             </Link>
           )}
-          {can("segment:read") && (
+          {SEGMENTS_ENABLED && can("segment:read") && (
             <Link
               href="/customers/segments"
               onClick={() => setMobileOpen(false)}
