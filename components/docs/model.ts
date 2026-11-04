@@ -69,7 +69,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, "*" | Permission[]> = {
     "stats:read", "stats:team",
   ],
   DIRECTOR: [
-    "stats:read", "stats:team", "stats:marketing",
+    "stats:read", "stats:team", "stats:marketing", "stats:spend",
     "team:supervise",
     "campaign:read",
     "user:read",
