@@ -24,7 +24,7 @@ export type Permission =
   | "segment:read" | "segment:write"
   | "template:read" | "template:write" | "template:send_marketing"
   | "saved_reply:read" | "saved_reply:write"
-  | "campaign:read" | "campaign:write" | "campaign:send" | "campaign:control"
+  | "campaign:read" | "campaign:write" | "campaign:send" | "campaign:control" | "flow:results"
   | "media:upload" | "media:read" | "media:write"
   | "user:read" | "user:write"
   | "stats:read" | "stats:team" | "stats:marketing" | "stats:spend" | "audit:read" | "clinic:read"

@@ -18,6 +18,8 @@ export default function FlowsPage() {
   const { ready, can } = useCurrentUser();
   const canRead = can("campaign:read");
   const canWrite = can("campaign:write");
+  // A director sees the flows, not how many patients went through them.
+  const canResults = can("flow:results");
   const { success, error } = useToast();
   const [flows, setFlows] = useState<FlowSummary[] | null>(null);
   const [deleting, setDeleting] = useState<FlowSummary | null>(null);
@@ -226,9 +228,13 @@ export default function FlowsPage() {
                 <th className="px-5 py-3 font-semibold">Flow</th>
                 <th className="px-5 py-3 font-semibold">Active</th>
                 <th className="px-5 py-3 font-semibold text-right">Campaigns</th>
-                <th className="px-5 py-3 font-semibold text-right">Responses</th>
-                <th className="px-5 py-3 font-semibold text-right">Completed</th>
-                <th className="px-5 py-3 font-semibold text-right">To agent</th>
+                {canResults && (
+                  <>
+                    <th className="px-5 py-3 font-semibold text-right">Responses</th>
+                    <th className="px-5 py-3 font-semibold text-right">Completed</th>
+                    <th className="px-5 py-3 font-semibold text-right">To agent</th>
+                  </>
+                )}
                 <th className="px-5 py-3 font-semibold">Updated</th>
                 <th className="px-5 py-3" />
               </tr>
@@ -252,9 +258,13 @@ export default function FlowsPage() {
                     </button>
                   </td>
                   <td className="px-5 py-3 text-right text-gray-700">{f.campaignCount}</td>
-                  <td className="px-5 py-3 text-right font-semibold text-gray-800">{f.runs.total}</td>
-                  <td className="px-5 py-3 text-right text-gray-700">{f.runs.COMPLETED ?? 0}</td>
-                  <td className="px-5 py-3 text-right text-gray-700">{f.runs.HANDED_OFF ?? 0}</td>
+                  {canResults && (
+                    <>
+                      <td className="px-5 py-3 text-right font-semibold text-gray-800">{f.runs.total}</td>
+                      <td className="px-5 py-3 text-right text-gray-700">{f.runs.COMPLETED ?? 0}</td>
+                      <td className="px-5 py-3 text-right text-gray-700">{f.runs.HANDED_OFF ?? 0}</td>
+                    </>
+                  )}
                   <td className="px-5 py-3 text-gray-400 whitespace-nowrap">{new Date(f.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</td>
                   <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">

@@ -16,11 +16,12 @@ import {
   type IsValidConnection,
   type ReactFlowInstance,
   SelectionMode,
+  useNodesInitialized,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { ClipboardPaste, Copy, CopyPlus, GripVertical, MessageSquare, List, HelpCircle, Tag, UserRound, Flag, FlaskConical, GalleryHorizontal, Images, Redo2, Scissors, Undo2, Wand2 } from "lucide-react";
 import { tidyLayout } from "@/lib/flowLayout";
-import type { AssignableUser, FlowGraph, FlowNodeData, FlowNodeType, FlowValidationError, Template } from "@/types";
+import type { AssignableUser, FlowGraph, FlowNames, FlowNodeData, FlowNodeType, FlowValidationError, Template } from "@/types";
 import { ADDABLE_STEPS, STEP_META, defaultData, outputsOf, uid, validateFlow } from "@/lib/flows";
 import { readFlowFile, relinkTemplates } from "@/lib/flowTransfer";
 import { StepNode, type StepFlowNode } from "./StepNode";
@@ -160,10 +161,14 @@ export interface FlowBuilderProps {
   onGraphChange?: (graph: FlowGraph) => void;
   /** Mark the flow's problems from the start, before any save (an imported flow). */
   checkOnOpen?: boolean;
+  /** Lay the steps out as a tree on open, without counting it as an edit (a director's view). */
+  arrangeOnOpen?: boolean;
+  /** Template and agent names for steps whose lists this person can't load. */
+  names?: FlowNames;
 }
 
 // Saving happens from the page header (Save button, Ctrl+S) through controlRef.
-export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverErrors, onSave, onDirtyChange, controlRef, onGraphChange, checkOnOpen = false }: FlowBuilderProps) {
+export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverErrors, onSave, onDirtyChange, controlRef, onGraphChange, checkOnOpen = false, arrangeOnOpen = false, names }: FlowBuilderProps) {
   const [nodes, setNodes] = useState<StepFlowNode[]>(() => toRfNodes(initialGraph));
   const [edges, setEdges] = useState<Edge[]>(() => toRfEdges(initialGraph));
   const [selectedId, setSelectedId] = useState<string | null>(initialGraph.nodes[0]?.id ?? null);
@@ -216,6 +221,13 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
       if (c.type === "remove") setSelectedId((s) => (s === c.id ? null : s));
     }
   }, [markDirty]);
+
+  // Read-only: only the cards' measured sizes get through (the tree layout
+  // needs them); nothing can move, connect or be deleted.
+  const onSizesChange = useCallback((changes: NodeChange<StepFlowNode>[]) => {
+    const sizes = changes.filter((c) => c.type === "dimensions");
+    if (sizes.length) setNodes((ns) => applyNodeChanges(sizes, ns));
+  }, []);
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     setEdges((es) => applyEdgeChanges(changes, es));
@@ -447,8 +459,9 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
   }, [selectedSteps, clipOf, placeClip]);
 
   // Tidy up (Shift+Alt+T, like n8n): lay every step out left to right by
-  // where it sits in the flow. One Ctrl+Z puts them back.
-  const tidyUp = useCallback(() => {
+  // where it sits in the flow. One Ctrl+Z puts them back. `asEdit` false
+  // arranges a read-only view: nothing to save.
+  const arrange = useCallback((asEdit: boolean) => {
     const pos = tidyLayout(
       nodes.map((n) => ({
         id: n.id,
@@ -461,9 +474,20 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
       edges.map((e) => ({ source: e.source, sourceHandle: e.sourceHandle || "next", target: e.target })),
     );
     setNodes((ns) => ns.map((n) => (pos[n.id] ? { ...n, position: pos[n.id] } : n)));
-    markDirty();
-    setTimeout(() => rf?.fitView({ duration: 300, padding: 0.15, maxZoom: 1 }), 50);
+    if (asEdit) markDirty();
+    setTimeout(() => rf?.fitView({ duration: asEdit ? 300 : 0, padding: 0.15, maxZoom: 1 }), 50);
   }, [nodes, edges, markDirty, rf]);
+  const tidyUp = useCallback(() => arrange(true), [arrange]);
+
+  // A director sees the flow as a tree however the builder left it: arranged
+  // once, as soon as every card has its real size.
+  const nodesSized = useNodesInitialized();
+  const arranged = useRef(false);
+  useEffect(() => {
+    if (!arrangeOnOpen || arranged.current || !rf || !nodesSized) return;
+    arranged.current = true;
+    arrange(false);
+  }, [arrangeOnOpen, rf, nodesSized, arrange]);
 
   // Cut (Ctrl+X): copy the selected steps, then remove them and their lines.
   const cutSelected = useCallback(async () => {
@@ -691,7 +715,7 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          onNodesChange={readOnly ? undefined : onNodesChange}
+          onNodesChange={readOnly ? onSizesChange : onNodesChange}
           onEdgesChange={readOnly ? undefined : onEdgesChange}
           onConnect={readOnly ? undefined : onConnect}
           isValidConnection={isValidConnection}
@@ -829,11 +853,21 @@ export function FlowBuilder({ initialGraph, templates, agents, readOnly, serverE
             agents={agents}
             variables={variables}
             readOnly={readOnly}
+            names={names}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-2">
-            <p className="text-[14px] font-semibold text-gray-700">Select a step to edit it</p>
-            <p className="text-[12px] text-gray-400">Start with the Start step: add the campaign template&apos;s buttons, then build what happens after each tap.</p>
+            {readOnly ? (
+              <>
+                <p className="text-[14px] font-semibold text-gray-700">Click a step to read it</p>
+                <p className="text-[12px] text-gray-400">The flow starts at the Start step on the left. Each line is what happens after a patient taps a button or answers.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-[14px] font-semibold text-gray-700">Select a step to edit it</p>
+                <p className="text-[12px] text-gray-400">Start with the Start step: add the campaign template&apos;s buttons, then build what happens after each tap.</p>
+              </>
+            )}
           </div>
         )}
       </aside>

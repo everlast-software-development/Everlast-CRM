@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Trash2, X } from "lucide-react";
-import type { AssignableUser, FlowInputType, FlowMediaType, FlowNodeData, FlowNodeType, FlowOption, Template } from "@/types";
+import type { AssignableUser, FlowInputType, FlowMediaType, FlowNames, FlowNodeData, FlowNodeType, FlowOption, Template } from "@/types";
 import { BUILT_IN_VARIABLES, FLOW_LIMITS, STEP_META, VARIABLE_RE, carouselSnapshot, templateStartButtons, uid } from "@/lib/flows";
 import { CardsEditor } from "./CardsEditor";
 import { FormatTextarea } from "./FormatTextarea";
@@ -14,6 +14,13 @@ const labelCls = "block text-[11px] font-bold tracking-wider uppercase text-gray
 function Counter({ value, max }: { value: string | undefined; max: number }) {
   const n = (value || "").length;
   return <span className={`text-[11px] ${n > max ? "text-red-500 font-semibold" : "text-gray-400"}`}>{n}/{max}</span>;
+}
+
+// A saved template or agent this person can't list (a director viewing the
+// flow): an option with its name, so the picker shows it instead of "Choose…".
+function missingOption(id: number | null | undefined, list: { id: number }[], names?: Record<number, string>) {
+  if (!id || list.some((x) => x.id === id)) return null;
+  return <option value={id}>{names?.[id] ?? "(not available)"}</option>;
 }
 
 function Field({ label, children, aside }: { label: string; children: React.ReactNode; aside?: React.ReactNode }) {
@@ -132,9 +139,11 @@ export interface StepEditorProps {
   agents: AssignableUser[];
   variables: string[];
   readOnly?: boolean;
+  /** Names for a saved template or agent missing from the lists above. */
+  names?: FlowNames;
 }
 
-export function StepEditor({ type, data, problems, onChange, onDelete, templates, agents, variables, readOnly }: StepEditorProps) {
+export function StepEditor({ type, data, problems, onChange, onDelete, templates, agents, variables, readOnly, names }: StepEditorProps) {
   const meta = STEP_META[type];
   // Always merged into the step's latest data (see FlowBuilder.updateData).
   const set = (patch: Partial<FlowNodeData>) => onChange((prev) => ({ ...prev, ...patch }));
@@ -187,6 +196,7 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
                 }}
               >
                 <option value="">Choose a template…</option>
+                {missingOption(data.templateId, templates, names?.templates)}
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({t.cards?.length ? `carousel, ${templateStartButtons(t).length} card buttons` : `${templateStartButtons(t).length} quick replies`})
@@ -405,6 +415,7 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
                 }}
               >
                 <option value="">Choose a carousel template…</option>
+                {missingOption(data.templateId, templates, names?.templates)}
                 {templates.filter((t) => t.cards && t.cards.length).map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({t.cards!.length} cards){t.approvalStatus === "SUBMITTED" ? " · pending Meta approval" : ""}
@@ -513,6 +524,7 @@ export function StepEditor({ type, data, problems, onChange, onDelete, templates
                 onChange={(e) => set({ agentId: e.target.value ? Number(e.target.value) : null })}
               >
                 <option value="">The team (leave in the Unassigned queue)</option>
+                {missingOption(data.agentId, agents, names?.users)}
                 {agents.map((a) => <option key={a.id} value={a.id}>{a.name || a.username}</option>)}
               </select>
             </Field>
