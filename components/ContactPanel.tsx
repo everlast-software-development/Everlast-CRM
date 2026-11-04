@@ -415,7 +415,7 @@ export function ContactPanel({
             onChange={(e) => { setNotes(e.target.value); setNotesDirty(true); }}
             rows={3}
             placeholder={canEdit ? "Add a note for the team — e.g. prefers evenings, allergic to…" : "No notes"}
-            className="w-full resize-y border border-gray-200 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-brand disabled:bg-gray-50"
+            className="bidi w-full resize-y border border-gray-200 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-brand disabled:bg-gray-50"
           />
           {notesDirty && (
             <div className="flex justify-end gap-2 mt-1.5">
@@ -446,7 +446,7 @@ export function ContactPanel({
                 rows={2}
                 maxLength={NOTE_MAX}
                 placeholder="Add a note for the team — e.g. called back, will confirm Thursday…"
-                className="w-full resize-y border border-gray-200 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-brand"
+                className="bidi w-full resize-y border border-gray-200 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-brand"
               />
               <div className="flex items-center justify-end gap-2 mt-1.5">
                 {noteDraft.length > NOTE_MAX - 200 && (
@@ -477,7 +477,7 @@ export function ContactPanel({
                       <p className="text-[11px] text-gray-400">
                         <span className="font-semibold text-gray-700">{mine ? "You" : personName(n.author)}</span> · {fmtDateTime(n.createdAt)}
                       </p>
-                      <p className="text-[13px] text-gray-700 whitespace-pre-wrap break-words">{n.body}</p>
+                      <p className="bidi text-[13px] text-gray-700 whitespace-pre-wrap break-words">{n.body}</p>
                     </div>
                     {(mine || canSupervise) && (
                       <button

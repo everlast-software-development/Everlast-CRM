@@ -137,7 +137,7 @@ function BubbleBody({ m }: { m: Message }) {
       </a>
     );
   }
-  return <p className="text-[13px] leading-snug whitespace-pre-wrap break-words text-[#1F2A24]">{m.content}</p>;
+  return <p className="bidi text-[13px] leading-snug whitespace-pre-wrap break-words text-[#1F2A24]">{m.content}</p>;
 }
 
 function Messages({ messages }: { messages: Message[] }) {
@@ -598,7 +598,7 @@ export function ConversationDetail({
                     className="w-full text-left flex items-center gap-2 py-2 hover:bg-gray-50 rounded-lg px-1 cursor-pointer"
                   >
                     <span className="text-[12px] font-semibold text-gray-700 shrink-0">{o.whatsappNumber.label}</span>
-                    <span className="text-[12px] text-gray-500 truncate flex-1 min-w-0">{o.lastMessage || "No messages yet"}</span>
+                    <span className="bidi-line text-[12px] text-gray-500 truncate flex-1 min-w-0">{o.lastMessage || "No messages yet"}</span>
                     {o.waitingMinutes !== null && (
                       <span className={`text-[11px] font-semibold shrink-0 ${o.overSla ? "text-red-600" : "text-amber-600"}`}>
                         waiting {o.waitingMinutes >= 1440 ? `${Math.floor(o.waitingMinutes / 1440)}d` : o.waitingMinutes >= 60 ? `${Math.floor(o.waitingMinutes / 60)}h` : `${o.waitingMinutes}m`}
@@ -655,7 +655,7 @@ export function ConversationDetail({
                 disabled={!onChatsLine || savingNote}
                 rows={2}
                 placeholder={onChatsLine ? "Add a note for the team… (Ctrl+Enter)" : `Switch to ${lineLabel} to add a note`}
-                className="w-full resize-none bg-transparent px-3 py-2 text-[13px] text-gray-700 placeholder:text-gray-400 outline-none disabled:cursor-not-allowed"
+                className="bidi w-full resize-none bg-transparent px-3 py-2 text-[13px] text-gray-700 placeholder:text-gray-400 outline-none disabled:cursor-not-allowed"
               />
               <div className="flex justify-end px-2 pb-2">
                 <button
@@ -683,7 +683,7 @@ export function ConversationDetail({
                       <p className="text-[11.5px] text-gray-400">
                         <span className="font-semibold text-gray-700">{n.author ? personName(n.author) : "Someone"}</span> · {timeAgo(n.createdAt, now)}
                       </p>
-                      <p className="text-[13px] text-gray-700 whitespace-pre-wrap break-words mt-0.5">{n.body}</p>
+                      <p className="bidi text-[13px] text-gray-700 whitespace-pre-wrap break-words mt-0.5">{n.body}</p>
                     </div>
                   </li>
                 ))}

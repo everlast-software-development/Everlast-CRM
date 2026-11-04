@@ -490,7 +490,7 @@ export default function ChatsLayout({ children }: { children: ReactNode }) {
                     <div className="flex-1 min-w-0">
                       {/* Name + time */}
                       <div className="flex justify-between items-baseline gap-2">
-                        <span className={`text-[14px] truncate ${unread > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-800"}`}>
+                        <span className={`bidi-line text-[14px] truncate ${unread > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-800"}`}>
                           {displayName}
                         </span>
                         <span className={`text-[11px] shrink-0 tabular-nums ${unread > 0 ? "text-brand-fg font-semibold" : "text-gray-400"}`}>
@@ -514,9 +514,9 @@ export default function ChatsLayout({ children }: { children: ReactNode }) {
 
                       {/* Preview + unread count */}
                       <div className="flex justify-between items-center gap-2 mt-0.5">
-                        <span className={`text-[13px] truncate ${unread > 0 ? "text-gray-700" : "text-gray-500"}`}>
-                          {lastBy && <span className="text-gray-400">{lastBy}</span>}
-                          {c.lastMessage || "No messages yet"}
+                        <span className={`min-w-0 flex text-[13px] ${unread > 0 ? "text-gray-700" : "text-gray-500"}`}>
+                          {lastBy && <span className="shrink-0 whitespace-pre text-gray-400">{lastBy}</span>}
+                          <span className="bidi-line truncate">{c.lastMessage || "No messages yet"}</span>
                         </span>
                         {unread > 0 && (
                           <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-brand text-white text-[11px] font-semibold flex items-center justify-center tabular-nums">

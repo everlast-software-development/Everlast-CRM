@@ -798,7 +798,7 @@ export function LiveWall() {
                               <span className="text-amber-700 font-semibold">Unassigned</span>
                             )}
                           </span>
-                          <span className="hidden xl:block min-w-0 text-[13px] text-wall-ink/50 truncate">
+                          <span className="bidi-line hidden xl:block min-w-0 text-[13px] text-wall-ink/50 truncate">
                             {r.lastMessage ? messagePreview({ content: r.lastMessage }) : "—"}
                           </span>
                           <span className="justify-self-end">

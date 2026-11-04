@@ -245,7 +245,7 @@ function MessageSearch() {
                   </div>
 
                   {/* Message content — 2-line clamp */}
-                  <p className="text-[14px] text-gray-700 leading-relaxed line-clamp-2 break-words">
+                  <p className="bidi text-[14px] text-gray-700 leading-relaxed line-clamp-2 break-words">
                     <HighlightedText text={msg.content} term={lastQuery} />
                   </p>
 

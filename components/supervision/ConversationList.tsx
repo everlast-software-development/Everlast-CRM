@@ -87,9 +87,9 @@ function Row({
 
         {/* Latest message + the wait */}
         <div className="flex justify-between items-center gap-2 mt-0.5">
-          <span className={`text-[13px] truncate ${c.lastSenderType === "CUSTOMER" ? "text-gray-700" : "text-gray-500"}`}>
-            {prefix && <span className={c.lastSenderType === "CUSTOMER" ? "text-gray-500 font-medium" : "text-gray-400"}>{prefix}</span>}
-            {preview || <span className="italic text-gray-400">No messages yet</span>}
+          <span className={`min-w-0 flex text-[13px] ${c.lastSenderType === "CUSTOMER" ? "text-gray-700" : "text-gray-500"}`}>
+            {prefix && <span className={`shrink-0 whitespace-pre ${c.lastSenderType === "CUSTOMER" ? "text-gray-500 font-medium" : "text-gray-400"}`}>{prefix}</span>}
+            <span className="bidi-line truncate">{preview || <span className="italic text-gray-400">No messages yet</span>}</span>
           </span>
           <WaitChip minutes={waiting} slaMinutes={slaMinutes} />
         </div>

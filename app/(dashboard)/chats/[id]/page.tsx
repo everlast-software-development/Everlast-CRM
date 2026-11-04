@@ -619,8 +619,8 @@ function MessageContent({ msg, isAgent }: { msg: Message; isAgent: boolean }) {
       >
         <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-red-500" />
         <span className="min-w-0 text-[13px] leading-snug">
-          <span className="block font-semibold text-[#1F2A24] break-words">{location.name}</span>
-          {location.address && <span className="block text-gray-500 break-words">{location.address}</span>}
+          <span className="bidi block font-semibold text-[#1F2A24] break-words">{location.name}</span>
+          {location.address && <span className="bidi block text-gray-500 break-words">{location.address}</span>}
           <span className="block text-brand-fg mt-0.5">Open in Google Maps</span>
         </span>
       </a>
@@ -628,7 +628,7 @@ function MessageContent({ msg, isAgent }: { msg: Message; isAgent: boolean }) {
   }
 
   return (
-    <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words text-[#1F2A24]">
+    <p className="bidi text-[14px] leading-relaxed whitespace-pre-wrap break-words text-[#1F2A24]">
       {/* *bold*, _italic_, ~strike~ as WhatsApp shows them, not the raw markers */}
       <WaText text={msg.content} />
     </p>
@@ -1017,7 +1017,7 @@ function TemplatePickerModal({
                       <p className="text-[12px] font-semibold text-gray-700 mb-1">{selected.header}</p>
                     )}
                     <div className="bg-white rounded-xl rounded-tl-sm px-4 py-3 shadow-sm">
-                      <p className="text-[14px] text-gray-800 leading-relaxed whitespace-pre-wrap">
+                      <p className="bidi text-[14px] text-gray-800 leading-relaxed whitespace-pre-wrap">
                         {previewBody(selected.body)}
                       </p>
                       {selected.footer && (
@@ -1718,7 +1718,7 @@ export default function ConversationPage() {
             {initials}
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block font-semibold text-[14px] text-gray-900 leading-tight truncate">
+            <span className="bidi-line block font-semibold text-[14px] text-gray-900 leading-tight truncate">
               {customer?.name || customer?.phone || "Loading…"}
             </span>
             <span className="block text-[12px] text-gray-400 leading-tight truncate">
@@ -1844,7 +1844,7 @@ export default function ConversationPage() {
                                 <span className="text-[12px] text-gray-500">Photo</span>
                               </div>
                             ) : (
-                              <p className="text-[12px] text-gray-500 truncate leading-tight">
+                              <p className="bidi-line text-[12px] text-gray-500 truncate leading-tight">
                                 {messagePreview(qm)}
                               </p>
                             )}
@@ -1950,9 +1950,9 @@ export default function ConversationPage() {
                               <span className="text-[13px] text-gray-600 truncate">📄 {tpl.headerMediaUrl.split("/").pop() || "Document"}</span>
                             </a>
                           )}
-                          <p className="text-[14px] text-[#1F2A24] leading-relaxed whitespace-pre-wrap break-words"><WaText text={tpl.body} /></p>
+                          <p className="bidi text-[14px] text-[#1F2A24] leading-relaxed whitespace-pre-wrap break-words"><WaText text={tpl.body} /></p>
                           {tpl.footer && (
-                            <p className="text-[11px] text-gray-500 italic mt-1.5 leading-snug">{tpl.footer}</p>
+                            <p className="bidi text-[11px] text-gray-500 italic mt-1.5 leading-snug">{tpl.footer}</p>
                           )}
                           <div className="flex items-center justify-end gap-1 mt-0.5 -mb-0.5">
                             <span className="text-[10px] text-gray-500">{formatMessageTime(msg.createdAt)}</span>
@@ -1978,7 +1978,7 @@ export default function ConversationPage() {
                                     <div className="h-36 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-[12px] text-gray-500">▶ Video</div>
                                   )}
                                 </div>
-                                <p className="flex-1 px-3 pt-2 pb-2.5 text-[13px] leading-snug text-[#1F2A24] whitespace-pre-wrap break-words">
+                                <p className="bidi flex-1 px-3 pt-2 pb-2.5 text-[13px] leading-snug text-[#1F2A24] whitespace-pre-wrap break-words">
                                   <WaText text={card.body} />
                                 </p>
                                 {card.buttons.length > 0 && (
@@ -2064,7 +2064,7 @@ export default function ConversationPage() {
                                       <span className="text-[12px] text-gray-500">Photo</span>
                                     </div>
                                   ) : (
-                                    <p className="text-[12px] text-gray-500 truncate leading-tight">
+                                    <p className="bidi-line text-[12px] text-gray-500 truncate leading-tight">
                                       {messagePreview(qm)}
                                     </p>
                                   )}
@@ -2162,7 +2162,7 @@ export default function ConversationPage() {
                     <span className="text-[12px] text-gray-500">Photo</span>
                   </div>
                 ) : (
-                  <p className="text-[12px] text-gray-500 truncate leading-tight">
+                  <p className="bidi-line text-[12px] text-gray-500 truncate leading-tight">
                     {messagePreview(replyingTo)}
                   </p>
                 )}
@@ -2269,7 +2269,7 @@ export default function ConversationPage() {
                   }
                 }}
                 placeholder={windowClosed ? "Messaging disabled — 24h window closed" : "Type a message..."}
-                className="flex-1 text-[14px] text-gray-700 placeholder:text-gray-400 outline-none bg-transparent resize-none overflow-hidden leading-[1.5] py-0.5 max-h-40 disabled:cursor-not-allowed"
+                className="bidi flex-1 text-[14px] text-gray-700 placeholder:text-gray-400 outline-none bg-transparent resize-none overflow-hidden leading-[1.5] py-0.5 max-h-40 disabled:cursor-not-allowed"
               />
 
               {showSavedReplies && savedReplies && (

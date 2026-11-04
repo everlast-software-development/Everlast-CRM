@@ -394,10 +394,10 @@ export default function CustomerDetailPage() {
                     onChange={(e) => setEditNotes(e.target.value)}
                     rows={4}
                     placeholder="Add notes about this contact…"
-                    className="px-3 py-2 border border-gray-200 rounded-xl text-[13px] text-gray-700 placeholder:text-gray-400 outline-none focus:border-brand transition-colors bg-white resize-y leading-relaxed"
+                    className="bidi px-3 py-2 border border-gray-200 rounded-xl text-[13px] text-gray-700 placeholder:text-gray-400 outline-none focus:border-brand transition-colors bg-white resize-y leading-relaxed"
                   />
                 ) : (
-                  <p className="text-[13px] text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  <p className="bidi text-[13px] text-gray-700 whitespace-pre-wrap leading-relaxed">
                     {customer.notes ?? (
                       <span className="text-gray-400 italic">No notes</span>
                     )}
