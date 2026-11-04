@@ -1324,12 +1324,15 @@ export default function ConversationPage() {
     }
   }
 
-  // Fetch names for any agent senderIds not already known
+  // Fetch names for any agent senderIds not already known. Messages from the
+  // chat history carry their sender's username (see senderNames below), which
+  // covers roles that can't look a colleague up (supervisors and agents have
+  // no user:read); only the rest are looked up.
   useEffect(() => {
     const unknownIds = [
       ...new Set(
         messages
-          .filter((m) => m.senderType === "AGENT" && m.senderId != null)
+          .filter((m) => m.senderType === "AGENT" && m.senderId != null && !m.sender?.username)
           .map((m) => String(m.senderId))
           .filter((sid) => {
             if (user && String(user.id) === sid) return false;
@@ -1353,6 +1356,12 @@ export default function ConversationPage() {
       }
     });
   }, [messages, user, conversation?.assignedAgent, agentCache]);
+
+  // Sender names for the bubbles: the ones messages carry, then any looked up.
+  const senderNames: Record<string, string> = { ...agentCache };
+  for (const m of messages) {
+    if (m.senderId != null && m.sender?.username) senderNames[String(m.senderId)] = m.sender.username;
+  }
 
   function handleTypingStop() {
     if (typingTimerRef.current) {
@@ -1884,7 +1893,7 @@ export default function ConversationPage() {
                       msg.senderId,
                       user,
                       conversation?.assignedAgent ?? null,
-                      agentCache,
+                      senderNames,
                     );
                 const senderChanged = groupStart;
                 const isBot = msg.senderType === "BOT";

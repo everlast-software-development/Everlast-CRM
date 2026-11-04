@@ -61,6 +61,8 @@ export interface Message {
   conversationId: string;
   senderType: "CUSTOMER" | "AGENT" | "BOT";
   senderId: string | null;
+  // Who on the team sent it (chat history only).
+  sender?: { id: number; name: string | null; username: string } | null;
   content: string;
   messageType: "TEXT" | "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "TEMPLATE" | "INTERACTIVE" | "STICKER";
   status: "PENDING" | "SENT" | "DELIVERED" | "READ" | "FAILED" | null;
