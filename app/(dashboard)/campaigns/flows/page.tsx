@@ -268,6 +268,9 @@ export default function FlowsPage() {
                   <td className="px-5 py-3 text-gray-400 whitespace-nowrap">{new Date(f.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</td>
                   <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
+                    {/* Copying and exporting a flow are for the people who build them. */}
+                    {canWrite && (
+                    <>
                     <button
                       type="button"
                       onClick={() => void copyFlow(f)}
@@ -286,6 +289,8 @@ export default function FlowsPage() {
                     >
                       <Download className={`w-4 h-4 ${exportingId === f.id ? "animate-pulse" : ""}`} />
                     </button>
+                    </>
+                    )}
                     {canWrite && (
                       <button
                         type="button"
