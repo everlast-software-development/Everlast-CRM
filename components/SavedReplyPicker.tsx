@@ -31,7 +31,7 @@ export const SavedReplyPicker = forwardRef<HTMLDivElement, {
       {empty ? (
         <div className="px-3 py-3 text-[12.5px] text-gray-500">
           No saved replies yet.
-          {canManage && <> <Link href="/settings?tab=saved-replies" className="text-brand-fg font-medium hover:underline">Add some in Settings</Link></>}
+          {canManage && <> <Link href="/patient-messages?tab=saved-replies" className="text-brand-fg font-medium hover:underline">Add some in Patient Messages</Link></>}
         </div>
       ) : replies.length === 0 ? (
         <p className="px-3 py-3 text-[12.5px] text-gray-500">No saved replies match.</p>

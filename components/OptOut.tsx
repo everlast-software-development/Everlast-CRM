@@ -58,7 +58,7 @@ const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day:
  * own category when known, else anything that isn't a GENERAL template.
  */
 export function isMarketingTemplate(t: Pick<Template, "category"> & { metaCategory?: string | null }): boolean {
-  return t.metaCategory ? t.metaCategory === "MARKETING" : t.category !== "GENERAL";
+  return t.metaCategory ? t.metaCategory === "MARKETING" : t.category !== "GENERAL" && t.category !== "UTILITY";
 }
 
 // ── Our own change, told to every opt-out view of the chat at once ───────────

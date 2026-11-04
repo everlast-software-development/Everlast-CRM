@@ -147,6 +147,15 @@ const EmojiPicker = lazy(() =>
   import("@emoji-mart/react").then((m) => ({ default: m.default }))
 );
 
+// Example text for a template's blanks in the picker (keys: utils/templateVars.js FILL_INS).
+const FILL_IN_PLACEHOLDER: Record<string, string> = {
+  date: "e.g. Monday 10 November",
+  time: "e.g. 4:30 PM",
+  doctor: "e.g. Dr. Sara",
+  branch: "e.g. Jumeirah",
+  details: "e.g. please arrive 10 minutes early",
+};
+
 // One-line preview of a message for quote blocks and the reply bar. A template's
 // content is stored as JSON, so show its body text rather than "[template]" —
 // replies to a campaign quote the template, and that is the message a reader
@@ -852,6 +861,8 @@ function TemplatePickerModal({
   const [search, setSearch] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What the agent typed for the selected template's blanks (date, time…).
+  const [fields, setFields] = useState<Record<string, string>>({});
   const optedOut = isOptedOut(optOut);
   // Agents send general and utility templates only; marketing ones stay hidden.
   const { can } = useCurrentUser();
@@ -864,13 +875,15 @@ function TemplatePickerModal({
   // every such template, whatever its category, and nothing that would bounce.
   const windowClosedMode = category === "RE_ENGAGEMENT";
   useEffect(() => {
-    apiGetTemplates(windowClosedMode ? { status: "APPROVED" } : { category, status: "APPROVED" })
+    apiGetTemplates({ status: "APPROVED" })
       .then((res) =>
         setTemplates(
           // Imported templates still needing setup (needsSetup) can't be sent.
+          // Inside the window: general ones and the Patient messages page's
+          // patient-care (UTILITY) ones.
           (windowClosedMode
             ? res.data.filter((t) => t.category !== "GENERAL" && !!t.metaTemplateName)
-            : res.data
+            : res.data.filter((t) => t.category === category || t.category === "UTILITY")
           ).filter((t) => !t.needsSetup?.length && (canMarketing || !isMarketingTemplate(t))),
         ),
       )
@@ -879,10 +892,16 @@ function TemplatePickerModal({
   }, [category, windowClosedMode, canMarketing]);
 
   function previewBody(body: string) {
-    return body
+    let out = body
       .replace(/\{\{customer_name\}\}/g, customerName || "Customer")
+      .replace(/\{\{first_name\}\}/g, (customerName || "Customer").trim().split(/\s+/)[0])
       .replace(/\{\{agent_name\}\}/g, agentName || "Agent");
+    for (const f of selected?.fillIns ?? []) {
+      out = out.replace(new RegExp(`\\{\\{\\s*${f.key}\\s*\\}\\}`, "g"), fields[f.key]?.trim() || `[${f.label}]`);
+    }
+    return out;
   }
+  const missingFillIns = (selected?.fillIns ?? []).filter((f) => !fields[f.key]?.trim());
 
   // An opted-out patient never gets a marketing template — the server refuses
   // it too (409 OPTED_OUT), with no override.
@@ -911,7 +930,7 @@ function TemplatePickerModal({
     setError(null);
     try {
       await guardedSend((confirmOtherOwner) =>
-        apiSendTemplate(conversationId, templateId, { clientMessageId: clientIdRef.current, confirmOtherOwner }),
+        apiSendTemplate(conversationId, templateId, { clientMessageId: clientIdRef.current, confirmOtherOwner, fields }),
       );
       onSent();
       onClose();
@@ -991,7 +1010,7 @@ function TemplatePickerModal({
                   <button
                     key={tpl.id}
                     type="button"
-                    onClick={() => { setSelected(tpl); setError(null); }}
+                    onClick={() => { setSelected(tpl); setFields({}); setError(null); }}
                     className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${
                       selected?.id === tpl.id ? "bg-brand-100 border-l-2 border-l-brand" : ""
                     }`}
@@ -1011,6 +1030,29 @@ function TemplatePickerModal({
             {selected ? (
               <>
                 <div className="flex-1 p-6 overflow-y-auto">
+                  {/* The template's blanks ("your appointment is on [Date]"),
+                      typed here and shown in the preview as you go. */}
+                  {(selected.fillIns?.length ?? 0) > 0 && (
+                    <div className="mb-5">
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Fill in</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {selected.fillIns!.map((f, i) => (
+                          <label key={f.key} className="block">
+                            <span className="block text-[12px] font-medium text-gray-600 mb-1">{f.label}</span>
+                            <input
+                              type="text"
+                              autoFocus={i === 0}
+                              value={fields[f.key] ?? ""}
+                              maxLength={60}
+                              onChange={(e) => setFields((p) => ({ ...p, [f.key]: e.target.value }))}
+                              placeholder={FILL_IN_PLACEHOLDER[f.key] ?? f.label}
+                              className="bidi w-full text-[13px] border border-gray-200 rounded-lg px-2.5 py-2 outline-none focus:border-brand"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">Preview</p>
                   <div className="bg-[#f0f2f5] rounded-xl p-4 max-w-[340px]">
                     {selected.header && (
@@ -1051,7 +1093,7 @@ function TemplatePickerModal({
                   <button
                     type="button"
                     onClick={handleSend}
-                    disabled={sending || selectedBlocked}
+                    disabled={sending || selectedBlocked || missingFillIns.length > 0}
                     className="w-full py-2.5 bg-brand hover:bg-[#2f5840] disabled:opacity-60 text-[14px] font-semibold text-white rounded-xl cursor-pointer transition-colors flex items-center justify-center gap-2"
                   >
                     <Send className="w-4 h-4" />

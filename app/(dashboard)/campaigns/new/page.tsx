@@ -57,6 +57,7 @@ const META_BILLING_CATEGORY: Record<string, keyof typeof UAE_RATES_USD> = {
   CAMPAIGN: "MARKETING",
   RE_ENGAGEMENT: "MARKETING",
   GENERAL: "UTILITY",
+  UTILITY: "UTILITY",
 };
 
 // Per-message cost for a template; unknown categories assume the priciest

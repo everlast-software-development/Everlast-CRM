@@ -22,7 +22,7 @@ export type Permission =
   | "contact:delete" | "contact:bulk_delete"
   | "list:read" | "list:write"
   | "segment:read" | "segment:write"
-  | "template:read" | "template:write" | "template:send_marketing"
+  | "template:read" | "template:write" | "template:send_marketing" | "template:write_utility"
   | "saved_reply:read" | "saved_reply:write"
   | "campaign:read" | "campaign:write" | "campaign:send" | "campaign:control" | "flow:results"
   | "media:upload" | "media:read" | "media:write"
