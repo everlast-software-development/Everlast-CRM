@@ -20,6 +20,8 @@ import type { Customer, Conversation, Template, SegmentDefinition } from "@/type
 import SegmentBuilder from "@/components/SegmentBuilder";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { isMarketingTemplate } from "@/components/OptOut";
+import { useActiveNumber } from "@/components/WhatsAppNumberProvider";
+import { SEGMENTS_ENABLED } from "@/lib/features";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -716,6 +718,41 @@ function CustomerDetailDrawer({ customer, conv, onClose, onSaved, onDeleted }: D
 
 // ─── Skeleton row ─────────────────────────────────────────────────────────────
 
+// Contacts are shared by every WhatsApp line: which ones this patient has
+// written to (or been written to on), so nobody mistakes whose chat it is.
+function LinesCell({ customer, labelOf }: { customer: Customer; labelOf: (id: number) => string }) {
+  const ids = [...new Set((customer.conversations ?? []).map((c) => c.whatsappNumberId))];
+  if (!ids.length) return <span className="text-[12px] text-gray-300">No chat yet</span>;
+  return (
+    <div className="flex flex-wrap gap-1 max-w-[220px]">
+      {ids.map((id) => (
+        <span key={id} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 truncate max-w-[200px]" title={labelOf(id)}>
+          {labelOf(id)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Whether marketing reaches them: a team opt-out covers every line; STOP on
+// one line opts them out of that line only.
+function MarketingCell({ customer, labelOf }: { customer: Customer; labelOf: (id: number) => string }) {
+  if (customer.optedOut) {
+    return (
+      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600 whitespace-nowrap" title="Team opt-out: no line sends them campaigns or marketing templates">
+        Opted out · all lines
+      </span>
+    );
+  }
+  const lines = (customer.optOuts ?? []).map((o) => labelOf(o.whatsappNumberId));
+  if (!lines.length) return <span className="text-[12px] text-gray-500">Subscribed</span>;
+  return (
+    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 inline-block truncate max-w-[200px]" title={`Opted out on ${lines.join(", ")}`}>
+      Opted out · {lines.join(", ")}
+    </span>
+  );
+}
+
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-100 animate-pulse">
@@ -729,6 +766,8 @@ function SkeletonRow() {
           </div>
         </div>
       </td>
+      <td className="px-4 py-3.5"><div className="h-5 bg-gray-100 rounded-full w-24" /></td>
+      <td className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded w-16" /></td>
       <td className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded w-12" /></td>
       <td className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded w-8" /></td>
       <td className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded w-16" /></td>
@@ -1214,12 +1253,14 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function CRMPage() {
+  const { numbers } = useActiveNumber();
+  const lineLabel = (id: number) => numbers.find((n) => n.id === id)?.label ?? "Removed line";
   // Everyone who reaches Contacts can view and edit contacts; everything below
   // is shown only to roles whose permissions include it (see CurrentUserProvider).
   const { can } = useCurrentUser();
   const canImport = can("contact:import");
   const canBulkDelete = can("contact:bulk_delete");
-  const canSaveSegment = can("segment:write");
+  const canSaveSegment = SEGMENTS_ENABLED && can("segment:write");
   const canOpenChat = can("conversation:write");
   const canMessage = can("message:send", "conversation:write");
   const canCampaign = can("campaign:write", "campaign:send");
@@ -1745,7 +1786,7 @@ export default function CRMPage() {
                   className="w-4 h-4 rounded border-gray-300 text-brand-fg accent-brand cursor-pointer align-middle"
                 />
               </th>
-              {["Patient", "Gender", "Age", "Nationality", "Top Dept", "Join Date", "Email", "Activity", ""].map((h, hi) => (
+              {["Patient", "Messaged on", "Marketing", "Gender", "Age", "Nationality", "Top Dept", "Join Date", "Email", "Activity", ""].map((h, hi) => (
                 <th key={hi} className="sticky top-0 z-10 bg-white shadow-[0_1px_0_#e5e7eb] text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-4 py-3 whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -1753,7 +1794,7 @@ export default function CRMPage() {
           <tbody>
             {!loading && selectingAll && (
               <tr>
-                <td colSpan={10} className="px-4 py-2 text-center">
+                <td colSpan={12} className="px-4 py-2 text-center">
                   <span className="inline-flex items-center gap-1.5 text-[12px] text-gray-500">
                     <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
                     Selecting all matching contacts…
@@ -1763,7 +1804,7 @@ export default function CRMPage() {
             )}
             {!loading && selectAllMatching && matchCap && (
               <tr className="bg-amber-50 border-b border-amber-200/60">
-                <td colSpan={10} className="px-4 py-2.5 text-center">
+                <td colSpan={12} className="px-4 py-2.5 text-center">
                   <span className="text-[13px] text-amber-700">
                     Selected the first <span className="font-semibold">{matchCap.reachable.toLocaleString()}</span> of{" "}
                     <span className="font-semibold">{matchCap.total.toLocaleString()}</span> matching — the maximum at once.
@@ -1779,7 +1820,7 @@ export default function CRMPage() {
               Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
             ) : customers.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-5 py-16 text-center">
+                <td colSpan={12} className="px-5 py-16 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center">
                       <svg className="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -1846,6 +1887,9 @@ export default function CRMPage() {
                         </div>
                       </div>
                     </td>
+
+                    <td className="px-4 py-3.5"><LinesCell customer={customer} labelOf={lineLabel} /></td>
+                    <td className="px-4 py-3.5"><MarketingCell customer={customer} labelOf={lineLabel} /></td>
 
                     {/* Gender */}
                     <td className="px-4 py-3.5">

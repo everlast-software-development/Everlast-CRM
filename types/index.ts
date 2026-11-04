@@ -26,6 +26,8 @@ export interface Customer {
   optedOut?: boolean;
   // The lines this contact is opted out of marketing on (sent in the list).
   optOuts?: { whatsappNumberId: number }[];
+  // The lines they have a chat on (sent in the list).
+  conversations?: { whatsappNumberId: number }[];
   createdAt: string;
 }
 

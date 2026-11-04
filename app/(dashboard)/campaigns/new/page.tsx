@@ -32,6 +32,7 @@ import { useActiveNumber } from "@/components/WhatsAppNumberProvider";
 import { isCustomerOptedOutOnLine } from "@/components/OptOut";
 import { describeRule } from "@/components/SegmentBuilder";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
+import { SEGMENTS_ENABLED } from "@/lib/features";
 import { CAMPAIGN_CATEGORIES, CAMPAIGN_CATEGORY_COLORS } from "@/lib/campaignCategories";
 import { FlowPicker } from "@/components/flows/FlowPicker";
 import { LIMITS } from "@/components/templates/shared";
@@ -548,6 +549,9 @@ function Step2({
           >
             Lists
           </button>
+          {/* Segments are switched off for now (lib/features); a draft
+              already aimed at one still shows it. */}
+          {(SEGMENTS_ENABLED || segmentAudience) && (
           <button
             type="button"
             onClick={() => setMode("segments")}
@@ -557,6 +561,7 @@ function Step2({
           >
             Segments
           </button>
+          )}
         </div>
 
         {mode === "segments" ? (
