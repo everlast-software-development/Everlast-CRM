@@ -219,6 +219,11 @@ function LineCard({ line, free }: { line: SpendingLine; free: number }) {
         <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
           <div className={`h-full rounded-full ${TONE_BAR[tone]}`} style={{ width: `${pct}%` }} />
         </div>
+        <p className="text-[10.5px] text-gray-400 mt-1">
+          {line.freeServiceSource === "meta"
+            ? "Counted by WhatsApp"
+            : "Counted from this app's messages (WhatsApp's count isn't available for this line)"}
+        </p>
       </div>
 
       <div className="mt-3 overflow-x-auto">

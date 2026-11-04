@@ -1528,6 +1528,9 @@ export interface SpendingLine extends SpendBucket {
   isDefault: boolean;
   freeServiceUsed: number;
   freeServiceLeft: number;
+  // "meta": WhatsApp's own count; "app": counted from the app's messages
+  // (Meta's usage couldn't be read for this line).
+  freeServiceSource?: "meta" | "app";
 }
 export interface SpendingReport {
   month: string;
