@@ -24,6 +24,8 @@ export interface Customer {
   tags: string[];
   notes: string | null;
   optedOut?: boolean;
+  // The lines this contact is opted out of marketing on (sent in the list).
+  optOuts?: { whatsappNumberId: number }[];
   createdAt: string;
 }
 

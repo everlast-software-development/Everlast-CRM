@@ -852,8 +852,6 @@ function TemplatePickerModal({
   const [search, setSearch] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The server refused a marketing template: the patient opted out (409 OPTED_OUT).
-  const [optOutPrompt, setOptOutPrompt] = useState<"line" | "all" | null>(null);
   const optedOut = isOptedOut(optOut);
   // Agents send general and utility templates only; marketing ones stay hidden.
   const { can } = useCurrentUser();
@@ -886,11 +884,16 @@ function TemplatePickerModal({
       .replace(/\{\{agent_name\}\}/g, agentName || "Agent");
   }
 
+  // An opted-out patient never gets a marketing template — the server refuses
+  // it too (409 OPTED_OUT), with no override.
   const filtered = templates.filter(
     (t) =>
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.body.toLowerCase().includes(search.toLowerCase())
+      !(optedOut && isMarketingTemplate(t)) &&
+      (t.name.toLowerCase().includes(search.toLowerCase()) ||
+        t.body.toLowerCase().includes(search.toLowerCase()))
   );
+  // Picked before the opt-out arrived live: shown, but can't be sent.
+  const selectedBlocked = optedOut && !!selected && isMarketingTemplate(selected);
 
   async function handleSend() {
     if (!selected || sendingRef.current) return;
@@ -899,25 +902,23 @@ function TemplatePickerModal({
       sendingRef.current = false;
       return;
     }
-    await send(selected.id, false);
+    await send(selected.id);
   }
 
-  // confirmOptedOut: the agent confirmed the opted-out patient asked for it.
-  // Same clientMessageId on the retry: the refused try created nothing.
-  async function send(templateId: number, confirmOptedOut: boolean) {
+  async function send(templateId: number) {
     sendingRef.current = true;
     setSending(true);
     setError(null);
     try {
       await guardedSend((confirmOtherOwner) =>
-        apiSendTemplate(conversationId, templateId, { clientMessageId: clientIdRef.current, confirmOtherOwner, confirmOptedOut }),
+        apiSendTemplate(conversationId, templateId, { clientMessageId: clientIdRef.current, confirmOtherOwner }),
       );
       onSent();
       onClose();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send template";
       if (err instanceof ApiError && err.code === "OPTED_OUT") {
-        setOptOutPrompt(err.details?.scope === "all" ? "all" : "line");
+        setError(`This patient opted out of marketing (${err.details?.scope === "all" ? "all lines" : "this line"}), so marketing templates can't be sent.`);
       } else if (isWindowClosedError(err)) {
         setError("The 24-hour window is closed, and this template isn't approved by Meta — pick an approved one.");
       } else if (msg.toLowerCase().includes("approved")) {
@@ -959,7 +960,7 @@ function TemplatePickerModal({
                 <ShieldOff className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
                 <p className="text-[11.5px] text-red-700 leading-snug">
                   <span className="font-semibold">Opted out of marketing ({optOutWhere}).</span>{" "}
-                  Marketing templates are marked. Only send one if the patient asked for it.
+                  Marketing templates are hidden and can&apos;t be sent.
                 </p>
               </div>
             )}
@@ -997,11 +998,6 @@ function TemplatePickerModal({
                   >
                     <p className="flex items-center gap-1.5 min-w-0">
                       <span className="text-[13px] font-medium text-gray-900 truncate">{tpl.name}</span>
-                      {optedOut && isMarketingTemplate(tpl) && (
-                        <span className="shrink-0 text-[10px] font-semibold text-red-600 bg-red-50 border border-red-100 rounded-full px-1.5">
-                          Marketing
-                        </span>
-                      )}
                     </p>
                     <p className="text-[11px] text-gray-400 truncate mt-0.5">{tpl.body.slice(0, 50)}…</p>
                   </button>
@@ -1039,10 +1035,10 @@ function TemplatePickerModal({
                     )}
                   </div>
                 </div>
-                {optedOut && isMarketingTemplate(selected) && (
+                {selectedBlocked && (
                   <div className="px-6 pb-3">
                     <p className="text-[12.5px] text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-                      This is a marketing template and the patient opted out of marketing ({optOutWhere}). Only send it if they asked for it.
+                      This is a marketing template and the patient opted out of marketing ({optOutWhere}). It can&apos;t be sent.
                     </p>
                   </div>
                 )}
@@ -1055,7 +1051,7 @@ function TemplatePickerModal({
                   <button
                     type="button"
                     onClick={handleSend}
-                    disabled={sending}
+                    disabled={sending || selectedBlocked}
                     className="w-full py-2.5 bg-brand hover:bg-[#2f5840] disabled:opacity-60 text-[14px] font-semibold text-white rounded-xl cursor-pointer transition-colors flex items-center justify-center gap-2"
                   >
                     <Send className="w-4 h-4" />
@@ -1076,31 +1072,6 @@ function TemplatePickerModal({
           </div>
         </div>
       </div>
-      {optOutPrompt && selected && (
-        <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center px-4" onClick={() => setOptOutPrompt(null)}>
-          <div role="alertdialog" aria-modal="true" className="bg-white rounded-2xl shadow-2xl w-[400px] max-w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[15px] font-bold text-gray-900 mb-1.5 flex items-center gap-2">
-              <ShieldOff className="w-4 h-4 text-red-500" /> Patient opted out of marketing
-            </h3>
-            <p className="text-[13px] text-gray-500 mb-5">
-              This patient opted out of marketing ({optOutPrompt === "all" ? "all lines" : "this line"}). Only send
-              &ldquo;{selected.name}&rdquo; if they asked for it. The send is recorded in the audit log.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button type="button" autoFocus onClick={() => setOptOutPrompt(null)} className="px-4 py-2 rounded-xl text-[13px] font-medium text-gray-600 hover:bg-gray-50 cursor-pointer">
-                Don&apos;t send
-              </button>
-              <button
-                type="button"
-                onClick={() => { const tid = selected.id; setOptOutPrompt(null); void send(tid, true); }}
-                className="px-4 py-2 rounded-xl text-[13px] font-semibold text-white bg-red-500 hover:bg-red-600 cursor-pointer"
-              >
-                They asked for it. Send
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>,
     document.body
   );
