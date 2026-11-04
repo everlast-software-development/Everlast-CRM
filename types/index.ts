@@ -144,6 +144,16 @@ export interface ContactList {
   updatedAt: string;
 }
 
+// A ready-made answer inserted into a chat with "/". {name} in the body is the
+// patient's first name, filled in when inserted.
+export interface SavedReply {
+  id: number;
+  shortcut: string;
+  title: string;
+  body: string;
+  updatedAt: string;
+}
+
 export interface ContactListListResponse {
   success: boolean;
   data: ContactList[];

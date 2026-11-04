@@ -318,9 +318,10 @@ function DashboardShell({ children }: { children: ReactNode }) {
     // What WhatsApp is costing per line this month: admins and directors.
     { href: "/spending",     icon: Wallet,      label: "Spending",      perm: "stats:spend" as const },
     { href: recentErrors > 0 ? "/audit?tab=errors" : "/audit", icon: ClipboardList, label: "Audit Log", perm: "audit:read" as const, badge: recentErrors > 0 ? recentErrors : undefined },
-    // Users, WhatsApp numbers, quiet hours, campaign safety, my account.
-    // Admin only; Team & Access lives here now (/team redirects).
-    { href: "/settings",  icon: Settings,        label: "Settings",      perm: "settings:write" as const },
+    // Users, WhatsApp numbers, quiet hours, campaign safety, saved replies, my
+    // account. Admins get it all; supervisors get it for Saved replies alone.
+    // Team & Access lives here now (/team redirects).
+    { href: "/settings",  icon: Settings,        label: "Settings",      perm: can("settings:write") ? "settings:write" as const : "saved_reply:write" as const },
   ].filter((i) => can(i.perm));
 
   /* ── desktop nav item: icon + label that fades in on expand ── */
