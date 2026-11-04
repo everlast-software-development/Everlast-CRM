@@ -76,7 +76,7 @@ const live: DocPage = {
       <Bullets
         items={[
           <><Ui>Full screen</Ui> (press Esc to leave it), a line selector, and a sound toggle (off by default) for a soft beep on events.</>,
-          <>The numbers refresh every 15 seconds and the feed every 5. While the connection is down it shows <b>Reconnecting…</b>.</>,
+          <>The numbers refresh every 10 seconds and the feed every 3. While the connection is down it shows <b>Reconnecting…</b>.</>,
           <>The clock shows Dubai time. <Ui>Exit</Ui> goes back to Supervision.</>,
         ]}
       />

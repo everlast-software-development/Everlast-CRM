@@ -33,7 +33,7 @@ import { personName } from "@/components/supervision/format";
 // and the URL is what brings the supervisor straight back to the same chat.
 
 const PAGE = 30;
-const POLL_MS = 30_000;
+const POLL_MS = 15_000;
 const DEBOUNCE_MS = 800;
 const LIVE_EVENTS = ["message.created", "conversation.updated", "conversation.assigned", "conversation.outcome", "conversation.note", "flow.handoff"];
 
