@@ -67,9 +67,9 @@ const chatting: DocPage = {
   group: GROUP,
   icon: MessageSquareText,
   description: "Text, emoji, files, message status and the message menu",
-  keywords: "send message reply media image pdf attach emoji delete copy quote ticks read delivered",
+  keywords: "send message reply media image pdf attach emoji delete copy quote ticks read delivered viewing typing seen by",
   visible: inboxUser,
-  body: () => (
+  body: (ctx) => (
     <>
       <Who roles={rolesWith("message:send")} />
       <Lead>Open a chat from the inbox. The header shows the patient, the chat&apos;s status, its follow-up and who owns it.</Lead>
@@ -123,6 +123,17 @@ const chatting: DocPage = {
         If the chat belongs to someone else, you&apos;re asked once: <b>&ldquo;This chat is assigned to …&rdquo;</b>. Click{" "}
         <Ui>Reply anyway</Ui> to send. The owner sees your reply in their chat.
       </P>
+      <H>Who else is in the chat</H>
+      <P>
+        Small avatars next to the patient&apos;s name show colleagues who have the same chat open right now, and turn amber with
+        &ldquo;is typing…&rdquo; while one of them is writing a reply — so two people don&apos;t answer the same patient at once.
+      </P>
+      {ctx.can("team:supervise") && (
+        <P>
+          <b>Seen by</b> (in the contact panel, and on a chat in Supervision) lists who opened the chat while it belonged to someone
+          else, how many times and when. Only supervisors and admins see it; opening your own chat or an unassigned one isn&apos;t recorded.
+        </P>
+      )}
     </>
   ),
 };
@@ -192,6 +203,14 @@ const ownership: DocPage = {
             ? <>The assignee button in the header (your name, or <b>Unassigned</b>) lets you <Ui>Assign to me</Ui>, pick a teammate (a dot
                 shows whether they&apos;re online, on break or offline), or <Ui>Unassign</Ui>.</>
             : <>Your role can&apos;t reassign chats. The header shows who owns it.</>,
+          ...(ctx.can("conversation:assign") && !ctx.can("team:supervise")
+            ? [<>A <b>colleague&apos;s chat</b> is theirs to hand over or follow up. You can read it and reply, and <Ui>Take over</Ui> it
+                yourself only while they&apos;re on a break or offline — you&apos;re asked to confirm, and the switch is recorded. If they&apos;re
+                online, ask them or a supervisor.</>]
+            : ctx.can("team:supervise")
+              ? [<>As a supervisor you can reassign, follow up or close <b>any</b> chat. Agents can only change their own and unassigned
+                  ones, and take over a colleague&apos;s chat while that colleague is away.</>]
+              : []),
           <>If a colleague changed the owner a moment before you, you&apos;re told who has it now. Nothing is overwritten.</>,
         ]}
       />

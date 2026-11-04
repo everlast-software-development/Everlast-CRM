@@ -1464,3 +1464,18 @@ export interface MarketingStats {
   lineHealth: MarketingLineHealth[];
   attention: MarketingAttention;
 }
+
+// ── Who is looking at a chat ────────────────────────────────────────────────
+/** Someone with the chat open right now (socket "conversation.viewers"). */
+export interface ChatViewer {
+  id: number;
+  name: string | null;
+  username: string;
+}
+/** Someone who opened the chat while it belonged to a colleague. */
+export interface ChatSeenBy {
+  firstSeenAt: string;
+  lastSeenAt: string;
+  visits: number;
+  user: { id: number; name: string | null; username: string; role: string };
+}

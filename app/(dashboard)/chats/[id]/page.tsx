@@ -71,6 +71,7 @@ import {
 } from "media-chrome/react/media-store";
 import { isWindowClosed } from "@/lib/messagingWindow";
 import { AssigneePicker } from "@/components/AssigneePicker";
+import { ChatViewers } from "@/components/ChatViewers";
 import { ConversationOutcomeControl } from "@/components/ConversationOutcomeControl";
 import { OptOutBanner, isMarketingTemplate, isOptedOut, useOptOutState, type OptOutState } from "@/components/OptOut";
 import type { InboxConversation } from "@/lib/chatOutcome";
@@ -1655,6 +1656,9 @@ export default function ConversationPage() {
 
 
 
+        {/* Colleagues with this chat open right now (and who is typing). */}
+        <ChatViewers conversationId={id} typing={typingUsers} />
+
         {/* Lifecycle, follow-up and owner. All update live from the server's socket events,
             which patch the conversation list this header reads from. */}
         {conversation && (
@@ -1664,6 +1668,7 @@ export default function ConversationPage() {
               outcome={(conversation as InboxConversation).outcome ?? null}
               followUpAt={(conversation as InboxConversation).followUpAt ?? null}
               optOut={optOut}
+              owner={conversation.assignedAgent ?? null}
             />
             <AssigneePicker conversationId={id} assignee={conversation.assignedAgent ?? null} />
           </>

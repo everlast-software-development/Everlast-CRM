@@ -7,12 +7,15 @@ import { apiGetSegments, apiDeleteSegment, apiGetMe } from "@/lib/api";
 import { describeRule } from "@/components/SegmentBuilder";
 import { can } from "@/lib/permissions";
 import type { Segment } from "@/types";
+import { NoAccess } from "@/components/NoAccess";
+import { PageSpinner } from "@/components/ui/spinner";
+import { useCurrentUser } from "@/components/CurrentUserProvider";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-export default function SegmentsPage() {
+function SegmentsList() {
   const router = useRouter();
 
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -229,4 +232,13 @@ export default function SegmentsPage() {
       )}
     </div>
   );
+}
+
+// Not in the menu without segment:read; a typed-in address gets a clear answer
+// instead of a page of server errors.
+export default function SegmentsPage() {
+  const { ready, can: holds } = useCurrentUser();
+  if (!ready) return <PageSpinner />;
+  if (!holds("segment:read")) return <NoAccess what="segments" />;
+  return <SegmentsList />;
 }
