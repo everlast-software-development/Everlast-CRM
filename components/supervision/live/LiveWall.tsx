@@ -42,8 +42,8 @@ import { ThemeToggleButton } from "@/components/ThemeToggle";
 // Refresh: overview + needs-attention every 15s and on socket events
 // (debounced); the feed polls every 5s with `after` = newest item's time.
 
-const OVERVIEW_POLL_MS = 15_000;
-const FEED_POLL_MS = 5_000;
+const OVERVIEW_POLL_MS = 10_000;
+const FEED_POLL_MS = 3_000;
 const DEBOUNCE_MS = 1_000;
 const FEED_KEEP = 100;
 const TOAST_MS = 6_000;
@@ -444,7 +444,7 @@ export function LiveWall() {
     };
   }, []);
 
-  // ── Live: socket (debounced) + 15s poll ──
+  // ── Live: socket (debounced) + 10s poll ──
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const bump = () => setRefreshKey((k) => k + 1);
