@@ -410,6 +410,7 @@ function CreateUserDrawer({ open, onClose, onCreated }: CreateDrawerProps) {
               setUsernameTaken(null);
             }}
             placeholder="e.g. jane.smith"
+            maxLength={100}
             className={`${inputCls} ${usernameTaken ? takenCls : ""}`}
             aria-invalid={Boolean(usernameTaken)}
             autoComplete="off"
@@ -523,6 +524,7 @@ function EditUserDrawer({ open, user, onClose, onSaved }: EditDrawerProps) {
               setUsernameTaken(null);
             }}
             placeholder="e.g. jane.smith"
+            maxLength={100}
             className={`${inputCls} ${usernameTaken ? takenCls : ""}`}
             aria-invalid={Boolean(usernameTaken)}
             autoComplete="off"
