@@ -23,6 +23,7 @@ export type Permission =
   | "list:read" | "list:write"
   | "segment:read" | "segment:write"
   | "template:read" | "template:write" | "template:send_marketing"
+  | "saved_reply:read" | "saved_reply:write"
   | "campaign:read" | "campaign:write" | "campaign:send" | "campaign:control"
   | "media:upload" | "media:read" | "media:write"
   | "user:read" | "user:write"

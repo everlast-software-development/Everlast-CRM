@@ -1,4 +1,5 @@
 import type {
+  SavedReply,
   LoginResponse,
   ConversationListResponse,
   MessagesResponse,
@@ -1223,6 +1224,24 @@ export function apiSendTemplate(
 }
 
 // Lists
+// ── Saved replies ─────────────────────────────────────────────────────────
+
+export function apiGetSavedReplies() {
+  return apiFetch<{ success: boolean; data: SavedReply[] }>("/api/saved-replies");
+}
+
+export function apiCreateSavedReply(data: { shortcut: string; title: string; body: string }) {
+  return apiFetch<{ success: boolean; data: SavedReply }>("/api/saved-replies", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function apiUpdateSavedReply(id: number, data: Partial<{ shortcut: string; title: string; body: string }>) {
+  return apiFetch<{ success: boolean; data: SavedReply }>(`/api/saved-replies/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function apiDeleteSavedReply(id: number) {
+  return apiFetch<{ success: boolean }>(`/api/saved-replies/${id}`, { method: "DELETE" });
+}
+
 export function apiGetLists() {
   return apiFetch<ContactListListResponse>("/api/lists");
 }

@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MoonStar, ShieldCheck, Smartphone, UserRound, Users, type LucideIcon } from "lucide-react";
+import { MessageSquareText, MoonStar, ShieldCheck, Smartphone, UserRound, Users, type LucideIcon } from "lucide-react";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { PageSpinner } from "@/components/ui/spinner";
 import { SectionedLayout } from "@/components/SectionedLayout";
@@ -11,22 +11,27 @@ import { WhatsAppNumbersPanel } from "@/components/settings/WhatsAppNumbersPanel
 import { QuietHoursPanel } from "@/components/settings/QuietHoursPanel";
 import { CampaignSafetyPanel } from "@/components/settings/CampaignSafetyPanel";
 import { MyAccountPanel } from "@/components/settings/MyAccountPanel";
+import { SavedRepliesPanel } from "@/components/settings/SavedRepliesPanel";
+import type { Permission } from "@/lib/permissions";
 
 // The section lives in the URL (?tab=) so a link — or the old /team page — can
 // open a specific one, and a reload stays where you were. `wide` sections hold
-// tables; the rest are forms and get a narrower centred column.
+// tables; the rest are forms and get a narrower centred column. `perm` is what
+// a tab needs (null: everyone who reaches Settings); supervisors reach Settings
+// for Saved replies alone, so they see just that tab and My account.
 const TABS = [
-  { key: "users", label: "Users", group: "Workspace", icon: Users, wide: true, description: "Who can sign in, their roles and what they can access" },
-  { key: "numbers", label: "WhatsApp numbers", group: "Workspace", icon: Smartphone, wide: true, description: "The WhatsApp lines the team sends and receives on" },
-  { key: "quiet-hours", label: "Quiet hours", group: "Messaging", icon: MoonStar, wide: false, description: "When campaign messages are held back" },
-  { key: "campaign-safety", label: "Campaign safety", group: "Messaging", icon: ShieldCheck, wide: false, description: "Limits that protect patients and the number's quality" },
-  { key: "account", label: "My account", group: "Personal", icon: UserRound, wide: false, description: "Your profile and password" },
-] as const satisfies readonly { key: string; label: string; group: string; icon: LucideIcon; wide: boolean; description: string }[];
+  { key: "users", label: "Users", group: "Workspace", icon: Users, wide: true, perm: "user:write", description: "Who can sign in, their roles and what they can access" },
+  { key: "numbers", label: "WhatsApp numbers", group: "Workspace", icon: Smartphone, wide: true, perm: "number:write", description: "The WhatsApp lines the team sends and receives on" },
+  { key: "quiet-hours", label: "Quiet hours", group: "Messaging", icon: MoonStar, wide: false, perm: "settings:write", description: "When campaign messages are held back" },
+  { key: "campaign-safety", label: "Campaign safety", group: "Messaging", icon: ShieldCheck, wide: false, perm: "settings:write", description: "Limits that protect patients and the number's quality" },
+  { key: "saved-replies", label: "Saved replies", group: "Messaging", icon: MessageSquareText, wide: true, perm: "saved_reply:write", description: "Ready-made answers agents insert by typing /" },
+  { key: "account", label: "My account", group: "Personal", icon: UserRound, wide: false, perm: null, description: "Your profile and password" },
+] as const satisfies readonly { key: string; label: string; group: string; icon: LucideIcon; wide: boolean; perm: Permission | null; description: string }[];
 
 type TabKey = (typeof TABS)[number]["key"];
 
-function isTabKey(v: string | null): v is TabKey {
-  return TABS.some((t) => t.key === v);
+function isTabKey(v: string | null, tabs: readonly { key: string }[]): v is TabKey {
+  return tabs.some((t) => t.key === v);
 }
 
 function PageHeader() {
@@ -45,9 +50,11 @@ function PageHeader() {
 function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { can } = useCurrentUser();
+  const tabs = TABS.filter((t) => t.perm === null || can(t.perm));
   const raw = searchParams.get("tab");
-  const tab: TabKey = isTabKey(raw) ? raw : "users";
-  const current = TABS.find((t) => t.key === tab)!;
+  const tab: TabKey = isTabKey(raw, tabs) ? raw : tabs[0].key;
+  const current = tabs.find((t) => t.key === tab)!;
 
   function selectTab(key: TabKey) {
     router.replace(`/settings?tab=${key}`, { scroll: false });
@@ -57,7 +64,7 @@ function SettingsContent() {
     <SectionedLayout
       title="Settings"
       subtitle="Manage your workspace settings"
-      sections={TABS}
+      sections={tabs}
       active={current}
       onSelect={selectTab}
       columnClassName={current.wide ? "max-w-5xl" : "max-w-2xl"}
@@ -67,6 +74,7 @@ function SettingsContent() {
       {tab === "numbers" && <WhatsAppNumbersPanel key="numbers" />}
       {tab === "quiet-hours" && <QuietHoursPanel key="quiet-hours" />}
       {tab === "campaign-safety" && <CampaignSafetyPanel key="campaign-safety" />}
+      {tab === "saved-replies" && <SavedRepliesPanel key="saved-replies" />}
       {tab === "account" && <MyAccountPanel key="account" />}
     </SectionedLayout>
   );
@@ -78,7 +86,7 @@ export default function SettingsPage() {
   // Access comes from the server's permission list, never from the role
   // name: see CurrentUserProvider. `ready` is false until /users/me answers.
   const { ready, can } = useCurrentUser();
-  const allowed = can("settings:write");
+  const allowed = can("settings:write") || can("saved_reply:write");
 
   if (!ready) return <PageSpinner />;
   if (!allowed) {

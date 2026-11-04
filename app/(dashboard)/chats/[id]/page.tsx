@@ -24,6 +24,7 @@ import {
   PanelRight,
   ShieldOff,
   Copy,
+  MessageSquareText,
 } from "lucide-react";
 import {
   useMessages,
@@ -41,6 +42,7 @@ import {
   apiFetchMediaBlob,
   apiSendTyping,
   ApiError,
+  apiGetSavedReplies,
 } from "@/lib/api";
 import { ContactPanel } from "@/components/ContactPanel";
 import { MessageMenu } from "@/components/MessageMenu";
@@ -49,7 +51,9 @@ import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { useToast } from "@/components/ui/toast";
 import { useTheme } from "@/components/ThemeProvider";
 import { Spinner } from "@/components/ui/spinner";
-import type { Message, QuotedMessage, Template } from "@/types";
+import type { Message, QuotedMessage, SavedReply, Template } from "@/types";
+import { SavedReplyPicker } from "@/components/SavedReplyPicker";
+import { fillReply, filterReplies, slashQuery } from "@/lib/savedReplies";
 import {
   MediaPlayer,
   MediaPlayerAudio,
@@ -1183,6 +1187,39 @@ export default function ConversationPage() {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
 
+  // Saved replies: typing "/" at the start of the box (or the button beside
+  // emoji) opens the shared list; picking one inserts it for editing, never
+  // sends it. Loaded once; Settings → Saved replies keeps the list.
+  const canUseSavedReplies = can("saved_reply:read");
+  const [savedReplies, setSavedReplies] = useState<SavedReply[] | null>(null);
+  const [savedRepliesOpen, setSavedRepliesOpen] = useState(false); // opened by the button
+  const [savedRepliesDismissed, setSavedRepliesDismissed] = useState(false); // Esc while typing "/…"
+  const [savedReplyIndex, setSavedReplyIndex] = useState(0);
+  const savedReplyPickerRef = useRef<HTMLDivElement>(null);
+  const savedReplyButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!canUseSavedReplies) return;
+    let cancelled = false;
+    apiGetSavedReplies()
+      .then((res) => { if (!cancelled) setSavedReplies(res.data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [canUseSavedReplies]);
+
+  // Close the button-opened list on outside click, like the emoji picker.
+  useEffect(() => {
+    if (!savedRepliesOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (
+        savedReplyPickerRef.current?.contains(e.target as Node) ||
+        savedReplyButtonRef.current?.contains(e.target as Node)
+      ) return;
+      setSavedRepliesOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [savedRepliesOpen]);
+
   // Close emoji picker on outside click
   useEffect(() => {
     if (!showEmojiPicker) return;
@@ -1602,6 +1639,32 @@ export default function ConversationPage() {
     return () => clearInterval(t);
   }, []);
   const windowClosed = conversation ? isWindowClosed(conversation.lastCustomerMessageAt, nowTick) : false;
+
+  const savedReplySlash = slashQuery(message);
+  const showSavedReplies =
+    canUseSavedReplies && !windowClosed && savedReplies !== null && !savedRepliesDismissed &&
+    (savedReplySlash !== null || savedRepliesOpen);
+  const savedReplyMatches = !showSavedReplies || !savedReplies ? [] : savedReplySlash !== null ? filterReplies(savedReplies, savedReplySlash) : savedReplies;
+  const savedReplyActive = Math.min(savedReplyIndex, Math.max(0, savedReplyMatches.length - 1));
+
+  function insertSavedReply(reply: SavedReply) {
+    const text = fillReply(reply.body, customer?.name);
+    const ta = textareaRef.current;
+    // Typed "/hours": the reply replaces it. From the button: goes in at the cursor.
+    const start = savedReplySlash !== null ? 0 : (ta?.selectionStart ?? message.length);
+    const end = savedReplySlash !== null ? message.length : (ta?.selectionEnd ?? message.length);
+    setMessage(message.slice(0, start) + text + message.slice(end));
+    setSavedRepliesOpen(false);
+    setSavedReplyIndex(0);
+    requestAnimationFrame(() => {
+      if (!ta) return;
+      ta.focus();
+      ta.style.height = "auto";
+      ta.style.height = `${ta.scrollHeight}px`;
+      const pos = start + text.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  }
 
   return (
     <div className="relative flex h-full min-h-0">
@@ -2125,7 +2188,7 @@ export default function ConversationPage() {
               accept="image/*,video/mp4,video/3gpp,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
               onChange={handleFileSelect}
             />
-            <div className={`flex-1 flex items-end gap-3 rounded-2xl px-4 py-2.5 border transition-colors ${
+            <div className={`relative flex-1 flex items-end gap-3 rounded-2xl px-4 py-2.5 border transition-colors ${
               windowClosed
                 ? "bg-gray-100 border-gray-200 opacity-60 cursor-not-allowed"
                 : "bg-gray-50 border-gray-200"
@@ -2147,6 +2210,8 @@ export default function ConversationPage() {
                 onChange={(e) => {
                   if (windowClosed) return;
                   setMessage(e.target.value);
+                  setSavedReplyIndex(0);
+                  if (slashQuery(e.target.value) === null) setSavedRepliesDismissed(false);
                   e.target.style.height = "auto";
                   e.target.style.height = `${e.target.scrollHeight}px`;
 
@@ -2170,6 +2235,22 @@ export default function ConversationPage() {
                 onBlur={() => { handleTypingStop(); }}
                 onKeyDown={(e) => {
                   if (windowClosed) return;
+                  if (showSavedReplies) {
+                    const n = savedReplyMatches.length;
+                    if (e.key === "ArrowDown" && n) { e.preventDefault(); setSavedReplyIndex((savedReplyActive + 1) % n); return; }
+                    if (e.key === "ArrowUp" && n) { e.preventDefault(); setSavedReplyIndex((savedReplyActive - 1 + n) % n); return; }
+                    if (((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") && n) {
+                      e.preventDefault();
+                      insertSavedReply(savedReplyMatches[savedReplyActive]);
+                      return;
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setSavedRepliesOpen(false);
+                      if (savedReplySlash !== null) setSavedRepliesDismissed(true);
+                      return;
+                    }
+                  }
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     handleSend();
@@ -2180,6 +2261,41 @@ export default function ConversationPage() {
                 placeholder={windowClosed ? "Messaging disabled — 24h window closed" : "Type a message..."}
                 className="flex-1 text-[14px] text-gray-700 placeholder:text-gray-400 outline-none bg-transparent resize-none overflow-hidden leading-[1.5] py-0.5 max-h-40 disabled:cursor-not-allowed"
               />
+
+              {showSavedReplies && savedReplies && (
+                <SavedReplyPicker
+                  ref={savedReplyPickerRef}
+                  replies={savedReplyMatches}
+                  empty={savedReplies.length === 0}
+                  activeIndex={savedReplyActive}
+                  canManage={can("saved_reply:write")}
+                  onPick={insertSavedReply}
+                  onHover={setSavedReplyIndex}
+                />
+              )}
+
+              {canUseSavedReplies && (
+                <button
+                  ref={savedReplyButtonRef}
+                  type="button"
+                  disabled={windowClosed}
+                  title="Saved replies (type /)"
+                  aria-label="Saved replies"
+                  onClick={() => {
+                    if (!message) {
+                      // An empty box: start a "/" search, which opens the list.
+                      setMessage("/");
+                      requestAnimationFrame(() => textareaRef.current?.focus());
+                    } else {
+                      setSavedRepliesOpen((v) => !v);
+                    }
+                    setSavedRepliesDismissed(false);
+                  }}
+                  className={`text-gray-400 hover:text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0 mb-0.5 ${showSavedReplies ? "text-brand-fg" : ""}`}
+                >
+                  <MessageSquareText className="w-4 h-4" />
+                </button>
+              )}
 
               <div className="relative shrink-0">
                 <button
