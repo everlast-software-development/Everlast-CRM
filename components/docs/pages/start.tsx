@@ -1,9 +1,12 @@
 import { Compass, KeyRound, Rocket, ShieldCheck, UserRound } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
-import { LISTED_ROLES, ROLE_LABEL, roleCan, type DocPage } from "../model";
-import { Bullets, Callout, DocLink, H, Kbd, Lead, P, Shot, Steps, Table, Tiles, Ui } from "../primitives";
+import { LISTED_ROLES, ROLE_LABEL, roleCan, type DocCtx, type DocPage } from "../model";
+import { Bilingual, Bullets, Callout, DocLink, H, Kbd, Lead, P, Shot, Steps, Table, Tiles, Ui } from "../primitives";
 
 const GROUP = "Getting started";
+// Agents get a short guide: their accounts are set up for them, and the role
+// matrix is for the people who manage the team.
+const notAgent = (ctx: DocCtx) => ctx.role !== "AGENT";
 
 // What each role is for, in one line — shown on the welcome page.
 const ROLE_PURPOSE = {
@@ -67,6 +70,7 @@ const signingIn: DocPage = {
   icon: KeyRound,
   description: "Signing in, your session, signing out and the theme",
   keywords: "login password session logout dark mode theme expired",
+  visible: notAgent,
   body: (ctx) => (
     <>
       <Lead>Every member of the team has their own account. An admin creates it and gives you a username and a password.</Lead>
@@ -192,6 +196,7 @@ const roles: DocPage = {
   icon: ShieldCheck,
   description: "The roles and exactly what each can do",
   keywords: "supervisor agent marketing access rights matrix",
+  visible: notAgent,
   body: (ctx) => (
     <>
       <Lead>
@@ -227,41 +232,89 @@ const account: DocPage = {
   group: GROUP,
   icon: UserRound,
   description: "Your name, password and presence status",
-  keywords: "profile password change name status online break",
+  keywords: "profile password change name status online break حساب كلمة المرور الحالة",
   body: (ctx) => (
-    <>
-      <Lead>Your display name is what colleagues see on assignments, replies and reports.</Lead>
-      {ctx.can("settings:write") ? (
+    <Bilingual>
+      {(t) => (
         <>
-          <P>
-            Open <b>Settings → My account</b>. Change your <Ui>Display name</Ui> (up to 60 characters) and click <Ui>Save name</Ui>. To
-            change your password, enter the <Ui>Current password</Ui> and the new one twice (at least 8 characters), then click{" "}
-            <Ui>Change password</Ui>. Your other devices are signed out.
-          </P>
-          <Shot name="settings-account" alt="Settings, My account" />
+          <Lead>
+            {t(
+              "Your display name is what colleagues see on assignments, replies and reports.",
+              "اسمك الظاهر هو ما يراه زملاؤك على المحادثات المُسندة إليك وعلى ردودك وفي التقارير.",
+            )}
+          </Lead>
+          {/* Settings → My account opens for admins and supervisors (settings/page.tsx). */}
+          {ctx.can("settings:write") || ctx.can("saved_reply:write") ? (
+            <>
+              <P>
+                {t(
+                  <>Open <b>Settings → My account</b>. Change your <Ui>Display name</Ui> (up to 60 characters) and click <Ui>Save name</Ui>.
+                    To change your password, enter the <Ui>Current password</Ui> and the new one twice (at least 8 characters), then click{" "}
+                    <Ui>Change password</Ui>. Your other devices are signed out.</>,
+                  <>افتح <b>Settings → My account</b>. غيّر <Ui>Display name</Ui> (حتى 60 حرفاً) ثم اضغط <Ui>Save name</Ui>.
+                    لتغيير كلمة المرور، اكتب <Ui>Current password</Ui> ثم كلمة المرور الجديدة مرتين (8 أحرف على الأقل)، ثم اضغط{" "}
+                    <Ui>Change password</Ui>. سيتم تسجيل خروجك من أجهزتك الأخرى.</>,
+                )}
+              </P>
+              <Shot name="settings-account" alt={t("Settings, My account", "الإعدادات، حسابي")} />
+            </>
+          ) : (
+            <Callout tone="note" title={t("Changing your name or password", "تغيير الاسم أو كلمة المرور")}>
+              {t(
+                "Ask an admin to change your display name or to reset your password. After a reset you're signed out everywhere and sign in with the new password.",
+                "اطلب من مدير النظام تغيير اسمك الظاهر أو إعادة تعيين كلمة المرور. بعد إعادة التعيين يتم تسجيل خروجك من كل الأجهزة، ثم تدخل بكلمة المرور الجديدة.",
+              )}
+            </Callout>
+          )}
+          {ctx.can("conversation:write") && (
+            <>
+              <H>{t("Your status: Online, On break, Offline", "حالتك: Online و On break و Offline")}</H>
+              <P>
+                {t(
+                  <>Your status sits at the bottom of the inbox list. Click it to switch between <Ui>Online</Ui> and <Ui>On break</Ui>.{" "}
+                    <b>Offline is automatic</b>: about a minute after you close the app. Colleagues and supervisors see your status when
+                    they assign chats.</>,
+                  <>تظهر حالتك أسفل قائمة المحادثات. اضغط عليها للتبديل بين <Ui>Online</Ui> (متاح) و <Ui>On break</Ui> (في استراحة).{" "}
+                    <b>Offline يحدث تلقائياً</b>: بعد دقيقة تقريباً من إغلاق التطبيق. يرى الزملاء والمشرفون حالتك عند إسناد المحادثات.</>,
+                )}
+              </P>
+              <Shot name="agent-status-menu" alt={t("The status menu at the bottom of the inbox", "قائمة الحالة أسفل صندوق المحادثات")} />
+              <P>
+                {t(
+                  <>At the end of a shift, use <Ui>Hand over my chats…</Ui> in the same menu. See{" "}
+                    <DocLink to="ownership">Assigning & handing over</DocLink>.</>,
+                  <>في نهاية الدوام استخدم <Ui>Hand over my chats…</Ui> من نفس القائمة. راجع{" "}
+                    <DocLink to="ownership">إسناد المحادثات وتسليمها</DocLink>.</>,
+                )}
+              </P>
+            </>
+          )}
+          {/* Everyone else reads these on Signing in, which agents don't get. */}
+          {!notAgent(ctx) && (
+            <>
+              <H>{t("Light and dark mode", "الوضع الفاتح والداكن")}</H>
+              <P>
+                {t(
+                  <>Use the sun, moon and screen buttons in the top bar to choose <b>Light</b>, <b>Dark</b> or <b>System</b> (follow
+                    your device). The choice is remembered in this browser only.</>,
+                  <>استخدم أزرار الشمس والقمر والشاشة في الشريط العلوي لاختيار <b>Light</b> (فاتح) أو <b>Dark</b> (داكن) أو{" "}
+                    <b>System</b> (حسب جهازك). يُحفظ اختيارك في هذا المتصفح فقط.</>,
+                )}
+              </P>
+              <H>{t("Signing out", "تسجيل الخروج")}</H>
+              <P>
+                {t(
+                  <>Click <Ui>Sign out</Ui> at the bottom of the left sidebar. It also sets you offline. A session lasts 8 hours; after
+                    that you&apos;re asked to sign in again.</>,
+                  <>اضغط <Ui>Sign out</Ui> أسفل القائمة الجانبية اليسرى، وسيتم تحويل حالتك إلى Offline أيضاً. تستمر الجلسة 8 ساعات،
+                    بعدها يُطلب منك تسجيل الدخول مرة أخرى.</>,
+                )}
+              </P>
+            </>
+          )}
         </>
-      ) : (
-        <Callout tone="note" title="Changing your name or password">
-          Only admins can reach the My account page, which lives in Settings. Ask an admin to change your display name or to reset your
-          password.
-        </Callout>
       )}
-      {ctx.can("conversation:write") && (
-        <>
-          <H>Your status: Online, On break, Offline</H>
-          <P>
-            Your status sits at the bottom of the inbox list. Click it to switch between <Ui>Online</Ui> and <Ui>On break</Ui>.{" "}
-            <b>Offline is automatic</b>: about a minute after you close the app. Colleagues and supervisors see your status when they
-            assign chats.
-          </P>
-          <Shot name="agent-status-menu" alt="The status menu at the bottom of the inbox" />
-          <P>
-            At the end of a shift, use <Ui>Hand over my chats…</Ui> in the same menu. See{" "}
-            <DocLink to="ownership">Assigning & status</DocLink>.
-          </P>
-        </>
-      )}
-    </>
+    </Bilingual>
   ),
 };
 
