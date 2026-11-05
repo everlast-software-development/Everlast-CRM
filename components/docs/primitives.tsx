@@ -1,12 +1,64 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, startTransition, useContext, useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Info, Lightbulb, Maximize2, ShieldAlert, X } from "lucide-react";
 
 // The building blocks every documentation page is written with, so forty
 // pages read as one guide. Text sizes and colours follow the app's own.
+
+/** The language a bilingual page is showing. Every other page is English. */
+export type DocLang = "en" | "ar";
+/** Picks the English or the Arabic version of a piece of text. */
+export type Tr = <X>(en: X, ar: X) => X;
+
+const DocLangContext = createContext<DocLang>("en");
+// Named after the first bilingual page (the agent guide), kept so readers who
+// already chose Arabic there keep it on every bilingual page.
+const LANG_KEY = "docs-agent-guide-lang";
+
+/**
+ * A page written in English and Arabic: an English / العربية switch on top,
+ * remembered per browser and shared by every bilingual page. Arabic reads
+ * right-to-left. Button and tab names stay in English, as they are in the app.
+ */
+export function Bilingual({ children }: { children: (t: Tr, lang: DocLang) => ReactNode }) {
+  const [lang, setLang] = useState<DocLang>("en");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LANG_KEY);
+      // The reader's last choice, after hydration (the server renders English).
+      if (saved === "ar" || saved === "en") startTransition(() => setLang(saved));
+    } catch {}
+  }, []);
+  const choose = (l: DocLang) => {
+    setLang(l);
+    try { localStorage.setItem(LANG_KEY, l); } catch {}
+  };
+  const t: Tr = (en, ar) => (lang === "ar" ? ar : en);
+
+  return (
+    <DocLangContext.Provider value={lang}>
+      <div dir={lang === "ar" ? "rtl" : "ltr"} lang={lang}>
+        <div className="inline-flex items-center bg-gray-100 rounded-xl p-1 mb-5" dir="ltr" role="group" aria-label="Language">
+          {(["en", "ar"] as const).map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => choose(l)}
+              aria-pressed={lang === l}
+              className={`text-[13px] font-semibold px-4 py-1.5 rounded-lg transition-colors cursor-pointer ${lang === l ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              {l === "en" ? "English" : "العربية"}
+            </button>
+          ))}
+        </div>
+        {children(t, lang)}
+      </div>
+    </DocLangContext.Provider>
+  );
+}
 
 export function Lead({ children }: { children: ReactNode }) {
   return <p className="text-[15px] leading-relaxed text-gray-600 mb-6">{children}</p>;
@@ -82,20 +134,21 @@ export function Bullets({ items }: { items: ReactNode[] }) {
 }
 
 const CALLOUT = {
-  tip: { icon: Lightbulb, box: "bg-brand-50 border-brand-200", title: "text-brand-fg", label: "Tip" },
-  note: { icon: Info, box: "bg-sky-50 border-sky-200", title: "text-sky-700", label: "Good to know" },
-  warn: { icon: AlertTriangle, box: "bg-amber-50 border-amber-200", title: "text-amber-700", label: "Watch out" },
-  danger: { icon: ShieldAlert, box: "bg-red-50 border-red-200", title: "text-red-700", label: "Important" },
+  tip: { icon: Lightbulb, box: "bg-brand-50 border-brand-200", title: "text-brand-fg", label: { en: "Tip", ar: "نصيحة" } },
+  note: { icon: Info, box: "bg-sky-50 border-sky-200", title: "text-sky-700", label: { en: "Good to know", ar: "معلومة مفيدة" } },
+  warn: { icon: AlertTriangle, box: "bg-amber-50 border-amber-200", title: "text-amber-700", label: { en: "Watch out", ar: "انتبه" } },
+  danger: { icon: ShieldAlert, box: "bg-red-50 border-red-200", title: "text-red-700", label: { en: "Important", ar: "مهم" } },
 } as const;
 
 export function Callout({ tone = "note", title, children }: { tone?: keyof typeof CALLOUT; title?: string; children: ReactNode }) {
+  const lang = useContext(DocLangContext);
   const c = CALLOUT[tone];
   const Icon = c.icon;
   return (
     <div className={`flex gap-3 rounded-xl border px-4 py-3 mb-4 ${c.box}`}>
       <Icon className={`w-[18px] h-[18px] shrink-0 mt-0.5 ${c.title}`} />
       <div className="min-w-0 text-[13.5px] leading-relaxed text-gray-700">
-        <p className={`font-semibold mb-0.5 ${c.title}`}>{title ?? c.label}</p>
+        <p className={`font-semibold mb-0.5 ${c.title}`}>{title ?? c.label[lang]}</p>
         {children}
       </div>
     </div>
@@ -111,7 +164,7 @@ export function Table({ head, rows, highlightCol }: { head: ReactNode[]; rows: R
             {head.map((h, i) => (
               <th
                 key={i}
-                className={`text-left font-semibold text-gray-600 px-3.5 py-2.5 whitespace-nowrap ${i === highlightCol ? "bg-brand-100 text-brand-fg" : ""}`}
+                className={`text-start font-semibold text-gray-600 px-3.5 py-2.5 whitespace-nowrap ${i === highlightCol ? "bg-brand-100 text-brand-fg" : ""}`}
               >
                 {h}
               </th>
@@ -231,15 +284,25 @@ export function Shot({ name, alt, caption }: { name: string; alt: string; captio
   );
 }
 
+// Role names (model.ts ROLE_LABEL) as an Arabic page shows them.
+const ROLE_LABEL_AR: Record<string, string> = {
+  Admin: "مدير النظام",
+  Director: "المدير",
+  Supervisor: "مشرف",
+  Agent: "موظف",
+  Marketing: "التسويق",
+};
+
 /** Small role pills, e.g. "Who: Admin · Supervisor". */
 export function Who({ roles }: { roles: string[] }) {
+  const lang = useContext(DocLangContext);
   if (roles.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 mb-5 -mt-2">
-      <span className="text-[12px] text-gray-400">Who can use this:</span>
+      <span className="text-[12px] text-gray-400">{lang === "ar" ? "من يستخدم هذه الصفحة:" : "Who can use this:"}</span>
       {roles.map((r) => (
         <span key={r} className="text-[11.5px] font-semibold text-brand-fg bg-brand-100 rounded-full px-2 py-0.5">
-          {r}
+          {lang === "ar" ? ROLE_LABEL_AR[r] ?? r : r}
         </span>
       ))}
     </div>

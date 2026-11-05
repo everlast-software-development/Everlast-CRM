@@ -1,17 +1,14 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
 import Image from "next/image";
 import { BookOpen } from "lucide-react";
 import type { DocPage } from "../model";
-import { Callout, H, Kbd, Lead, P, Steps, Ui } from "../primitives";
+import { Bilingual, Callout, H, Kbd, Lead, P, Steps, Ui, type DocLang as Lang } from "../primitives";
 
 // The agent's quick guide: the screen and the inbox, in English or Arabic.
 // Screenshots carry numbered arrows drawn over them, so one image serves both
 // languages; the numbered list under each one says the same thing in full.
 
-type Lang = "en" | "ar";
-const LANG_KEY = "docs-agent-guide-lang";
 type T = { en: string; ar: string };
 
 /** One arrow: a numbered label at (lx, ly) pointing at (x, y), all in % of the image. */
@@ -219,37 +216,11 @@ const TEXT = {
   },
 };
 
-function AgentGuide() {
-  const [lang, setLang] = useState<Lang>("en");
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(LANG_KEY);
-      // The reader's last choice, after hydration (the server renders English).
-      if (saved === "ar" || saved === "en") startTransition(() => setLang(saved));
-    } catch {}
-  }, []);
-  const choose = (l: Lang) => {
-    setLang(l);
-    try { localStorage.setItem(LANG_KEY, l); } catch {}
-  };
+function AgentGuide({ lang }: { lang: Lang }) {
   const t = (x: T) => x[lang];
 
   return (
-    <div dir={lang === "ar" ? "rtl" : "ltr"} lang={lang}>
-      <div className="inline-flex items-center bg-gray-100 rounded-xl p-1 mb-5" dir="ltr" role="group" aria-label="Language">
-        {(["en", "ar"] as const).map((l) => (
-          <button
-            key={l}
-            type="button"
-            onClick={() => choose(l)}
-            aria-pressed={lang === l}
-            className={`text-[13px] font-semibold px-4 py-1.5 rounded-lg transition-colors ${lang === l ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            {l === "en" ? "English" : "العربية"}
-          </button>
-        ))}
-      </div>
-
+    <>
       <Lead>{t(TEXT.lead)}</Lead>
 
       <H>{t(TEXT.screen)}</H>
@@ -272,7 +243,7 @@ function AgentGuide() {
         <Kbd>Enter</Kbd> <Ui>Send</Ui> · <Kbd>Shift</Kbd> + <Kbd>Enter</Kbd> {lang === "ar" ? "سطر جديد" : "new line"} · <Kbd>/</Kbd>{" "}
         {lang === "ar" ? "الردود الجاهزة" : "saved replies"}
       </P>
-    </div>
+    </>
   );
 }
 
@@ -286,7 +257,7 @@ const agentGuide: DocPage = {
   // The first page for the people who answer chats (agents, supervisors);
   // admins see it by previewing one of those roles.
   visible: (ctx) => ctx.can("conversation:write") && !ctx.can("settings:write"),
-  body: () => <AgentGuide />,
+  body: () => <Bilingual>{(_t, lang) => <AgentGuide lang={lang} />}</Bilingual>,
 };
 
 export const agentGuidePages: DocPage[] = [agentGuide];
