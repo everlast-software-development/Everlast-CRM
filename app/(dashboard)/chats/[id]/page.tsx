@@ -147,6 +147,11 @@ const EmojiPicker = lazy(() =>
   import("@emoji-mart/react").then((m) => ({ default: m.default }))
 );
 
+// Attach / saved replies / emoji inside the message box: one 28px square each,
+// the height of one line of text, so the icons sit level with what's typed.
+const composerIconCls =
+  "flex items-center justify-center w-7 h-7 rounded-lg shrink-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors cursor-pointer";
+
 // Example text for a template's blanks in the picker (keys: utils/templateVars.js FILL_INS).
 const FILL_IN_PLACEHOLDER: Record<string, string> = {
   date: "e.g. Monday 10 November",
@@ -2240,7 +2245,10 @@ export default function ConversationPage() {
             </div>
           )}
 
-          <div className="flex items-end gap-3 px-4 py-3">
+          {/* Box, Template and Send share one 44px height so a single-line
+              message lines up; as the text grows the box grows upwards and
+              the buttons stay on the bottom line. */}
+          <div className="flex items-end gap-2 px-4 py-3">
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -2249,7 +2257,7 @@ export default function ConversationPage() {
               accept="image/*,video/mp4,video/3gpp,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
               onChange={handleFileSelect}
             />
-            <div className={`relative flex-1 flex items-end gap-3 rounded-2xl px-4 py-2.5 border transition-colors ${
+            <div className={`relative flex-1 flex items-end gap-1 min-h-11 rounded-xl px-1.5 py-[7px] border transition-colors ${
               windowClosed
                 ? "bg-gray-100 border-gray-200 opacity-60 cursor-not-allowed"
                 : "bg-gray-50 border-gray-200"
@@ -2258,7 +2266,9 @@ export default function ConversationPage() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={sending || windowClosed}
-                className="text-gray-400 hover:text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0 mb-0.5"
+                title="Attach a file"
+                aria-label="Attach a file"
+                className={composerIconCls}
               >
                 <Paperclip className="w-4 h-4" />
               </button>
@@ -2320,7 +2330,7 @@ export default function ConversationPage() {
                   }
                 }}
                 placeholder={windowClosed ? "Messaging disabled — 24h window closed" : "Type a message..."}
-                className="bidi flex-1 text-[14px] text-gray-700 placeholder:text-gray-400 outline-none bg-transparent resize-none overflow-hidden leading-[1.5] py-0.5 max-h-40 disabled:cursor-not-allowed"
+                className="bidi flex-1 min-w-0 px-1 text-[14px] text-gray-700 placeholder:text-gray-400 outline-none bg-transparent resize-none overflow-hidden leading-5 py-1 max-h-40 disabled:cursor-not-allowed"
               />
 
               {showSavedReplies && savedReplies && (
@@ -2352,7 +2362,7 @@ export default function ConversationPage() {
                     }
                     setSavedRepliesDismissed(false);
                   }}
-                  className={`text-gray-400 hover:text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0 mb-0.5 ${showSavedReplies ? "text-brand-fg" : ""}`}
+                  className={`${composerIconCls} ${showSavedReplies ? "!text-brand-fg" : ""}`}
                 >
                   <MessageSquareText className="w-4 h-4" />
                 </button>
@@ -2364,12 +2374,14 @@ export default function ConversationPage() {
                   type="button"
                   disabled={windowClosed}
                   onClick={() => setShowEmojiPicker((v) => !v)}
-                  className={`text-gray-400 hover:text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer mb-0.5 ${showEmojiPicker ? "text-brand-fg" : ""}`}
+                  title="Emoji"
+                  aria-label="Emoji"
+                  className={`${composerIconCls} ${showEmojiPicker ? "!text-brand-fg" : ""}`}
                 >
                   <Smile className="w-4 h-4" />
                 </button>
                 {showEmojiPicker && (
-                  <div ref={emojiPickerRef} className="absolute bottom-8 right-0 z-50 emoji-picker-green">
+                  <div ref={emojiPickerRef} className="absolute bottom-10 right-0 z-50 emoji-picker-green">
                     <Suspense fallback={null}>
                       <EmojiPicker
                         theme={resolvedTheme ?? "light"}
@@ -2398,13 +2410,13 @@ export default function ConversationPage() {
               type="button"
               onClick={() => windowClosed ? setReengagementOpen(true) : setTemplatePickerOpen(true)}
               title={windowClosed ? "Send an approved template" : "Insert template"}
-              className={`flex items-center gap-1.5 text-[12px] font-medium border rounded-xl px-2.5 py-2 transition-colors cursor-pointer shrink-0 ${
+              className={`flex items-center justify-center gap-1.5 h-11 min-w-11 text-[13px] font-medium border rounded-xl px-3 transition-colors cursor-pointer shrink-0 ${
                 windowClosed
                   ? "text-red-600 bg-red-50 border-red-300 hover:bg-red-100 hover:border-red-400"
-                  : "text-gray-500 hover:text-brand-fg hover:bg-brand-100 border-gray-200 hover:border-brand/30"
+                  : "text-gray-600 bg-white hover:text-brand-fg hover:bg-brand-100 border-gray-200 hover:border-brand/30"
               }`}
             >
-              <LayoutTemplate className="w-3.5 h-3.5" />
+              <LayoutTemplate className="w-4 h-4" />
               <span className="hidden sm:inline">Template</span>
             </button>
 
@@ -2412,10 +2424,10 @@ export default function ConversationPage() {
               type="button"
               onClick={handleSend}
               disabled={!message.trim() || sending || windowClosed}
-              className="flex items-center gap-2 bg-brand hover:bg-[#2f5840] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[13px] font-semibold px-4 py-2.5 rounded-xl transition-colors cursor-pointer shrink-0"
+              className="flex items-center justify-center gap-2 h-11 bg-brand hover:bg-[#2f5840] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[13px] font-semibold px-4 rounded-xl transition-colors cursor-pointer shrink-0"
             >
               Send
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-4 h-4" />
             </button>
           </div>
         </div>
