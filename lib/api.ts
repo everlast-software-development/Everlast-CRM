@@ -665,10 +665,20 @@ export function apiUpdateTemplate(
 export function apiGetUtilityTemplates() {
   return apiFetch<import("@/types").TemplateListResponse>("/api/templates/utility");
 }
-export function apiCreateUtilityTemplate(data: { name: string; body: string; footer?: string | null }) {
+// A patient-care template's editable parts (the API refuses offer wording and Copy code buttons).
+export interface UtilityTemplateInput {
+  name: string;
+  body: string;
+  footer?: string | null;
+  headerType?: import("@/types").TemplateHeaderType;
+  header?: string | null;
+  headerMediaUrl?: string | null;
+  buttons?: import("@/types").TemplateButton[] | null;
+}
+export function apiCreateUtilityTemplate(data: UtilityTemplateInput) {
   return apiFetch<import("@/types").TemplateResponse>("/api/templates/utility", { method: "POST", body: JSON.stringify(data) });
 }
-export function apiUpdateUtilityTemplate(id: number, data: { name?: string; body?: string; footer?: string | null }) {
+export function apiUpdateUtilityTemplate(id: number, data: Partial<UtilityTemplateInput>) {
   return apiFetch<import("@/types").TemplateResponse>(`/api/templates/utility/${id}`, { method: "PUT", body: JSON.stringify(data) });
 }
 export function apiSubmitUtilityTemplate(id: number) {
