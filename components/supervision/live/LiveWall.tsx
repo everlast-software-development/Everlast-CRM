@@ -266,7 +266,7 @@ function AgentTile({ agent, slaMinutes, now }: { agent: SupervisionAgent; slaMin
           value={agent.waiting}
           tone={late ? "red" : agent.waiting === 0 ? "muted" : undefined}
         />
-        <AgentStat label="Replies" value={agent.repliesToday} tone={agent.repliesToday === 0 ? "muted" : undefined} />
+        <AgentStat label="Answered" value={agent.answeredToday} tone={agent.answeredToday === 0 ? "muted" : undefined} />
         <AgentStat label="Avg" value={formatMinutes(agent.avgResponseMinutes)} tone={agent.avgResponseMinutes === null ? "muted" : undefined} />
       </div>
     </div>

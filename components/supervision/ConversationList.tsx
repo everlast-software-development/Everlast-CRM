@@ -8,6 +8,7 @@ import { WAIT_WARN_MINUTES, formatPhone, initials, messagePreview, patientName, 
 
 export const FILTER_TABS: { value: SupervisionFilter; label: string }[] = [
   { value: "waiting", label: "Waiting" },
+  { value: "unread", label: "Unread" },
   { value: "cold", label: "Gone cold" },
   { value: "halfway", label: "Dropped halfway" },
   { value: "follow_up", label: "Follow up" },
@@ -16,6 +17,7 @@ export const FILTER_TABS: { value: SupervisionFilter; label: string }[] = [
 
 const EMPTY: Partial<Record<SupervisionFilter, { title: string; sub: string }>> = {
   waiting: { title: "Nobody is waiting — nice.", sub: "Every patient who wrote in today has had a reply." },
+  unread: { title: "Nothing unread.", sub: "Chats with patient messages nobody on the team has opened yet show here." },
   cold: { title: "Nothing has gone cold.", sub: "Patients still waiting a day after they wrote show here." },
   halfway: { title: "Nobody dropped out of a flow.", sub: "Patients who stop or go quiet halfway through a flow show here." },
   follow_up: { title: "No follow-ups scheduled.", sub: "Chats an agent marked “Follow up” show here, soonest first." },
@@ -91,7 +93,17 @@ function Row({
             {prefix && <span className={`shrink-0 whitespace-pre ${c.lastSenderType === "CUSTOMER" ? "text-gray-500 font-medium" : "text-gray-400"}`}>{prefix}</span>}
             <span className="bidi-line truncate">{preview || <span className="italic text-gray-400">No messages yet</span>}</span>
           </span>
-          <WaitChip minutes={waiting} slaMinutes={slaMinutes} />
+          <span className="flex items-center gap-1.5 shrink-0">
+            <WaitChip minutes={waiting} slaMinutes={slaMinutes} />
+            {c.unreadCount > 0 && (
+              <span
+                title={`${c.unreadCount} unread message${c.unreadCount === 1 ? "" : "s"}`}
+                className="min-w-[20px] h-5 px-1.5 rounded-full bg-brand text-white text-[11px] font-bold tabular-nums flex items-center justify-center"
+              >
+                {c.unreadCount}
+              </span>
+            )}
+          </span>
         </div>
 
         {/* State: follow-up, flow, notes · line, owner */}

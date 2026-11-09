@@ -69,13 +69,15 @@ function AgentCard({ agent, active, now, onClick, onHandOver }: {
           </p>
         </div>
       </div>
-      <div className="grid grid-cols-4 gap-1.5 mt-3 pt-2.5 border-t border-gray-50">
+      <div className="grid grid-cols-3 gap-x-1.5 gap-y-2.5 mt-3 pt-2.5 border-t border-gray-50">
         <Stat label="Open" value={agent.openChats} tone={agent.openChats === 0 ? "muted" : undefined} />
         <Stat
           label={late ? `${agent.waitingOverSla} late` : "Waiting"}
           value={agent.waiting}
           tone={late ? "red" : agent.waiting === 0 ? "muted" : undefined}
         />
+        <Stat label="Unread" value={agent.unreadChats} tone={agent.unreadChats === 0 ? "muted" : undefined} />
+        <Stat label="Answered" value={agent.answeredToday} tone={agent.answeredToday === 0 ? "muted" : undefined} />
         <Stat label="Replies" value={agent.repliesToday} tone={agent.repliesToday === 0 ? "muted" : undefined} />
         <Stat label="Avg" value={formatMinutes(agent.avgResponseMinutes)} tone={agent.avgResponseMinutes === null ? "muted" : undefined} />
       </div>

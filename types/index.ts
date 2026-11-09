@@ -999,7 +999,14 @@ export interface SupervisionAgent {
   openChats: number;
   waiting: number;
   waitingOverSla: number;
+  // Messages they sent today.
   repliesToday: number;
+  // Patients they answered today: one per wait they replied to, however many
+  // messages the reply took (a patient who wrote last night counts today).
+  answeredToday: number;
+  // Their chats with patient messages nobody has opened yet.
+  unreadChats: number;
+  unreadMessages: number;
   // Their latest reply today (null if none yet).
   lastReplyAt: string | null;
   avgResponseMinutes: number | null;
@@ -1020,6 +1027,12 @@ export interface SupervisionOverview {
     followUpsDue: number;
     avgFirstResponseMinutes: number | null;
     unansweredToday: number;
+    // Patients the team answered today (see SupervisionAgent.answeredToday).
+    answeredToday: number;
+    // Open chats with patient messages nobody has opened yet.
+    unreadChats: number;
+    unreadMessages: number;
+    unreadUnassignedChats: number;
   };
   agents: SupervisionAgent[];
 }
@@ -1036,7 +1049,8 @@ export interface SupervisionFlowState {
 }
 
 // waiting = started waiting in the last 24h; cold = waiting longer than that.
-export type SupervisionFilter = "waiting" | "cold" | "halfway" | "follow_up" | "all";
+// unread = patient messages nobody on the team has opened yet.
+export type SupervisionFilter = "waiting" | "unread" | "cold" | "halfway" | "follow_up" | "all";
 
 // The same patient's chat on another line (the list shows one row per patient).
 export interface SupervisionOtherChat {
@@ -1058,6 +1072,7 @@ export interface SupervisionConversation {
   whatsappNumber: { id: number; label: string };
   assignedAgent: PersonRef | null;
   status: "OPEN" | "PENDING" | "RESOLVED";
+  unreadCount: number;
   lastMessage: string | null;
   lastMessageAt: string | null;
   lastSenderType: "CUSTOMER" | "AGENT" | "BOT" | null;

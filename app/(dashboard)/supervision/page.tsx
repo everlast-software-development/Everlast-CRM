@@ -264,12 +264,17 @@ function SupervisionScreen() {
       const k = overview.kpis;
       if (agentFilter === null) {
         c.waiting = k.waiting;
+        c.unread = k.unreadChats;
         c.cold = k.goneCold;
       } else if (agentFilter === "unassigned") {
         c.waiting = k.unassignedWaiting;
+        c.unread = k.unreadUnassignedChats;
       } else {
         const a = overview.agents.find((x) => x.id === agentFilter);
-        if (a) c.waiting = a.waiting;
+        if (a) {
+          c.waiting = a.waiting;
+          c.unread = a.unreadChats;
+        }
       }
     }
     // The open tab's own total is exact, whatever the filters.

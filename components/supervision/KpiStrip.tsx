@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Clock, Inbox, Timer, Workflow } from "lucide-react";
+import { CheckCheck, Clock, Inbox, MailOpen, Timer, Workflow } from "lucide-react";
 import type { SupervisionFilter, SupervisionOverview } from "@/types";
 import { formatMinutes } from "./format";
 
@@ -66,8 +66,8 @@ export function KpiStrip({
 }) {
   if (!overview) {
     return (
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className={`h-[104px] bg-white rounded-xl border border-gray-100 p-4 ${loading ? "animate-pulse" : ""}`}>
             <div className="h-2.5 w-24 bg-gray-100 rounded" />
             <div className="h-6 w-12 bg-gray-100 rounded mt-3" />
@@ -82,7 +82,7 @@ export function KpiStrip({
   const sla = overview.slaMinutes;
 
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
       <KpiCard
         title="Waiting for reply"
         icon={<Clock className="w-4 h-4" />}
@@ -104,6 +104,29 @@ export function KpiStrip({
             </>
           )
         }
+      />
+      <KpiCard
+        title="Unread"
+        icon={<MailOpen className="w-4 h-4" />}
+        value={k.unreadChats}
+        active={filter === "unread"}
+        onClick={() => onFilter("unread")}
+        sub={
+          k.unreadChats === 0 ? (
+            "Everything has been opened"
+          ) : (
+            <>
+              {k.unreadMessages} message{k.unreadMessages === 1 ? "" : "s"}
+              {k.unreadUnassignedChats > 0 && <span className="text-amber-600 font-semibold"> · {k.unreadUnassignedChats} unassigned</span>}
+            </>
+          )
+        }
+      />
+      <KpiCard
+        title="Answered today"
+        icon={<CheckCheck className="w-4 h-4" />}
+        value={k.answeredToday}
+        sub="Patients replied to by the team"
       />
       <KpiCard
         title="Dropped halfway"
