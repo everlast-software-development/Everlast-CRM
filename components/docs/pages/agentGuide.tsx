@@ -22,8 +22,8 @@ const INBOX_NOTES: Note[] = [
     x: 13, y: 18.5, lx: 33, ly: 3.2,
     label: { en: "Mine · Unassigned", ar: "Mine · Unassigned" },
     more: {
-      en: "Mine shows your chats. Unassigned shows patients nobody has taken yet — start there when you're free.",
-      ar: "تبويب Mine يعرض محادثاتك، وتبويب Unassigned يعرض مرضى لم يستلمهم أحد بعد — ابدأ منه عندما تكون متاحاً.",
+      en: "Mine shows your chats. New patients are given to you here automatically, with an alert and a chime. Unassigned holds patients who wrote while nobody was online.",
+      ar: "تبويب Mine يعرض محادثاتك، وتصلك فيه المحادثات الجديدة تلقائياً مع تنبيه وصوت. تبويب Unassigned يعرض مرضى كتبوا ولم يكن أحد متصلاً.",
     },
   },
   {
@@ -62,8 +62,8 @@ const INBOX_NOTES: Note[] = [
     x: 92, y: 9.5, lx: 80, ly: 19,
     label: { en: "Who owns the chat", ar: "صاحب المحادثة" },
     more: {
-      en: "The person this chat belongs to. When you reply to an unassigned chat, it becomes yours.",
-      ar: "الموظف المسؤول عن المحادثة. عندما ترد على محادثة غير مُسندة تصبح محادثتك.",
+      en: "The person this chat belongs to. Each new chat goes to one agent, so two people don't answer the same patient. Reply to an unassigned chat and it becomes yours.",
+      ar: "الموظف المسؤول عن المحادثة. كل محادثة جديدة تذهب لموظف واحد، حتى لا يرد شخصان على نفس المريض. إذا رددت على محادثة غير مُسندة تصبح محادثتك.",
     },
   },
   {
@@ -130,9 +130,9 @@ const TEXT = {
   screen: { en: "The screen", ar: "الشاشة" },
   answer: { en: "Answering a patient", ar: "الرد على مريض" },
   steps: [
-    { en: "Open the Unassigned tab (patients waiting for someone) or Mine (your chats).", ar: "افتح تبويب Unassigned (مرضى ينتظرون الرد) أو Mine (محادثاتك)." },
+    { en: "Open Mine. New patients are given to you automatically, and an alert tells you. Unassigned holds patients who wrote while nobody was online.", ar: "افتح تبويب Mine. تصلك المحادثات الجديدة تلقائياً مع تنبيه. تبويب Unassigned يعرض مرضى كتبوا ولم يكن أحد متصلاً." },
     { en: "Click a chat. Its messages open on the right.", ar: "اضغط على المحادثة، فتظهر رسائلها على اليمين." },
-    { en: "Type your reply and press Send. Replying to an unassigned chat makes it yours.", ar: "اكتب ردك واضغط Send. عندما ترد على محادثة غير مُسندة تصبح محادثتك." },
+    { en: "Type your reply and press Send. Replying to an unassigned chat makes it yours. If a colleague took it a moment before you, you're asked before your message goes out.", ar: "اكتب ردك واضغط Send. عندما ترد على محادثة غير مُسندة تصبح محادثتك. وإذا أخذها زميل قبلك بلحظة، يسألك التطبيق قبل إرسال رسالتك." },
   ],
   waiting: {
     en: "The timer under a chat shows how long the patient has been waiting for a reply: grey, then amber after 15 minutes, red after 30.",

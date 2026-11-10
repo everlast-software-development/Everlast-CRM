@@ -932,10 +932,16 @@ export interface TestPhonesSetting {
   phones: string[];
 }
 
+// Giving each new chat to one online agent automatically (the API's utils/autoAssign.js).
+export interface AutoAssignSetting {
+  enabled: boolean;
+}
+
 export interface WorkspaceSettings {
   quietHours: QuietHoursSetting;
   campaignSafety: CampaignSafetySetting;
   testPhones: TestPhonesSetting;
+  autoAssign: AutoAssignSetting;
 }
 
 export interface AdminWhatsAppNumber {

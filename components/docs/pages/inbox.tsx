@@ -467,10 +467,20 @@ const ownership: DocPage = {
           <Bullets
             items={[
               t(
+                <><b>New chats are given out automatically.</b> When a patient writes and nobody owns the chat, it goes straight to
+                  the online agent with the fewest open chats (taking turns when level), who gets an alert. With nobody online, it
+                  waits in <b>Unassigned</b> and is shared out when agents come online. An admin can turn this off in Settings →
+                  Assigning chats.</>,
+                <><b>المحادثات الجديدة تُوزَّع تلقائياً.</b> عندما يكتب مريض ولا أحد مسؤول عن محادثته، تذهب فوراً للموظف المتصل
+                  صاحب أقل عدد من المحادثات المفتوحة (بالتناوب عند التساوي)، ويصله تنبيه. إذا لم يكن أحد متصلاً، تنتظر في{" "}
+                  <b>Unassigned</b> وتُوزَّع عند اتصال الموظفين. يمكن للمدير إيقاف ذلك من Settings → Assigning chats.</>,
+              ),
+              t(
                 <><b>Replying claims the chat.</b> Send a message, file or template in an unassigned chat and it becomes yours. If two
-                  people reply at once, the first one wins.</>,
-                <><b>الرد يجعل المحادثة لك.</b> أرسل رسالة أو ملفاً أو قالباً في محادثة غير مُسندة فتصبح محادثتك. وإذا ردّ شخصان في
-                  نفس اللحظة، تكون للأسبق.</>,
+                  people send at once, the first one takes it and the other is asked before their message goes out, so the patient
+                  never gets two replies by accident.</>,
+                <><b>الرد يجعل المحادثة لك.</b> أرسل رسالة أو ملفاً أو قالباً في محادثة غير مُسندة فتصبح محادثتك. وإذا أرسل شخصان في
+                  نفس اللحظة، تكون للأسبق، ويُسأل الآخر قبل إرسال رسالته، فلا يصل المريض ردّان بالخطأ.</>,
               ),
               ctx.can("conversation:assign")
                 ? t(

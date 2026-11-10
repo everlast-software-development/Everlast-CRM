@@ -50,8 +50,8 @@ const welcome: DocPage = {
         <Bullets items={[
             <><b>WhatsApp lines.</b> The clinic has several WhatsApp numbers. Each one is a line. The inbox, templates, campaigns and stats
               all follow the line picked in the top-right switcher.</>,
-            <><b>Conversations.</b> One per patient per line. A patient writes, the chat shows up in the inbox, and someone on the team
-              takes it.</>,
+            <><b>Conversations.</b> One per patient per line. A patient writes, the chat shows up in the inbox, and the app gives it to
+              one online agent.</>,
             <><b>Follow-ups.</b> When the team needs to get back to a patient, the agent sets a follow-up on the chat. It comes back as a
               reminder when due, and is cancelled automatically if the patient writes first.</>,
             <><b>Campaigns.</b> Approved WhatsApp templates sent to an audience (a list or a segment), within safety limits: quiet hours,

@@ -4,7 +4,9 @@
 //   - a flow hands a customer to a person ("Connect me" / an Assign step) —
 //     "flow.handoff";
 //   - a follow-up a chat was set to has fallen due — "follow_up.due", sent only
-//     to the agent responsible for it (every tab, any line).
+//     to the agent responsible for it (every tab, any line);
+//   - a chat was given to this agent automatically — "chat.assigned_to_you"
+//     (Settings → Assigning chats; the API's utils/autoAssign.js), only to them.
 // The first goes to every connected user who can reply on that number, on
 // EVERY line they may use — nothing here filters by the active line. Shown as:
 //   - an alert card that stays until dismissed (a waiting customer shouldn't
@@ -15,7 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BellRing, CalendarClock, X } from "lucide-react";
+import { BellRing, CalendarClock, MessageCircle, X } from "lucide-react";
 import { getActiveNumber } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
@@ -40,9 +42,20 @@ function handoffTitle(h: Handoff): string {
   return `${who(h)} wants to talk to an agent`;
 }
 
+// A chat the app gave this agent (a new patient, or one waiting in Unassigned).
+interface AssignedToYou {
+  conversationId: number;
+  whatsappNumberId: number;
+  customerName: string | null;
+  customerPhone: string;
+  reason: string;
+  at: string;
+}
+
 type Alert =
   | { kind: "handoff"; key: string; at: string; h: Handoff }
-  | { kind: "follow_up"; key: string; at: string; f: FollowUpDueEvent };
+  | { kind: "follow_up"; key: string; at: string; f: FollowUpDueEvent }
+  | { kind: "assigned"; key: string; at: string; c: AssignedToYou };
 
 function chime() {
   try {
@@ -117,6 +130,11 @@ export default function HandoffNotifier() {
     goTo(f.whatsappNumberId, `/chats/${f.conversationId}`);
   }, [dismiss, goTo]);
 
+  const openAssigned = useCallback((c: AssignedToYou) => {
+    dismiss(`assigned-${c.conversationId}`);
+    goTo(c.whatsappNumberId, `/chats/${c.conversationId}`);
+  }, [dismiss, goTo]);
+
   useEffect(() => {
     const socket = getSocket();
     const canNotify = () => typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
@@ -148,13 +166,28 @@ export default function HandoffNotifier() {
       }
     };
 
+    // Already addressed to this agent by the server.
+    const onAssigned = (c: AssignedToYou) => {
+      push({ kind: "assigned", key: `assigned-${c.conversationId}`, at: c.at, c });
+      chime();
+      if (canNotify()) {
+        const n = new Notification(`New chat for you · ${who(c)}`, {
+          body: [c.reason === "waiting in Unassigned" ? "Was waiting in Unassigned" : "A patient is waiting for your reply", multiLine ? lineLabel(c.whatsappNumberId) : null].filter(Boolean).join(" · "),
+          tag: `assigned-${c.conversationId}`,
+        });
+        n.onclick = () => { window.focus(); openAssigned(c); n.close(); };
+      }
+    };
+
     socket.on("flow.handoff", onHandoff);
     socket.on("follow_up.due", onFollowUp);
+    socket.on("chat.assigned_to_you", onAssigned);
     return () => {
       socket.off("flow.handoff", onHandoff);
       socket.off("follow_up.due", onFollowUp);
+      socket.off("chat.assigned_to_you", onAssigned);
     };
-  }, [me, push, openHandoff, openFollowUp, lineLabel, multiLine]);
+  }, [me, push, openHandoff, openFollowUp, openAssigned, lineLabel, multiLine]);
 
   if (alerts.length === 0) return null;
 
@@ -199,6 +232,41 @@ export default function HandoffNotifier() {
                   onClick={() => openHandoff(h)}
                   className="flex-1 text-[13px] font-semibold text-white bg-brand hover:opacity-90 rounded-xl py-2"
                 >
+                  {otherLine ? "Switch line & open chat" : "Open chat"}
+                </button>
+                {enableDesktop}
+              </div>
+            </div>
+          );
+        }
+
+        if (a.kind === "assigned") {
+          const c = a.c;
+          const otherLine = multiLine && String(c.whatsappNumberId) !== activeNumberId;
+          return (
+            <div key={a.key} className="bg-white rounded-2xl shadow-xl border border-brand/30 overflow-hidden animate-in slide-in-from-bottom-2">
+              <div className="flex items-start gap-3 p-4">
+                <span className="w-9 h-9 rounded-full bg-brand-100 text-brand-fg flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-4.5 h-4.5" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-bold text-gray-900 leading-snug">
+                    New chat for you · <span className="break-words">{who(c)}</span>
+                  </p>
+                  <p className="text-[12px] text-gray-600 mt-0.5">
+                    {c.reason === "waiting in Unassigned" ? "Was waiting in Unassigned. It's yours now." : "A patient is waiting for your reply. It's yours now."}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {fmtTime(c.at)}
+                    {multiLine && <span className={otherLine ? "font-semibold text-amber-700" : undefined}> · {lineLabel(c.whatsappNumberId)}</span>}
+                  </p>
+                </div>
+                <button type="button" onClick={() => dismiss(a.key)} title="Dismiss" className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 shrink-0">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2 px-4 pb-3">
+                <button type="button" onClick={() => openAssigned(c)} className="flex-1 text-[13px] font-semibold text-white bg-brand hover:opacity-90 rounded-xl py-2">
                   {otherLine ? "Switch line & open chat" : "Open chat"}
                 </button>
                 {enableDesktop}

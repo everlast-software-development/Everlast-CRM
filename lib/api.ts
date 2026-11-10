@@ -989,6 +989,14 @@ export function apiSaveCampaignSafety(value: import("@/types").CampaignSafetySet
   );
 }
 
+export function apiSaveAutoAssign(value: import("@/types").AutoAssignSetting) {
+  return apiFetch<{ success: boolean; data: import("@/types").AutoAssignSetting }>(
+    "/api/settings/autoAssign",
+    { method: "PUT", body: JSON.stringify(value) },
+    { numberScoped: false },
+  );
+}
+
 export function apiSaveTestPhones(value: import("@/types").TestPhonesSetting) {
   return apiFetch<{ success: boolean; data: import("@/types").TestPhonesSetting }>(
     "/api/settings/testPhones",
