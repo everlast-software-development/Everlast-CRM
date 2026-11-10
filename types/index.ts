@@ -61,6 +61,8 @@ export interface Message {
   conversationId: string;
   senderType: "CUSTOMER" | "AGENT" | "BOT";
   senderId: string | null;
+  // "WEBSITE": an automatic message from the online store (no person sent it).
+  origin?: string | null;
   // Who on the team sent it (chat history only).
   sender?: { id: number; name: string | null; username: string } | null;
   content: string;

@@ -1934,9 +1934,13 @@ export default function ConversationPage() {
               (() => {
                 // A flow's message has no human sender: show it as the automation,
                 // never as whoever happens to be looking at the chat.
+                // Same for the online store's automatic messages: "Website".
+                const isWebsite = msg.origin === "WEBSITE";
                 const agent = msg.senderType === "BOT"
                   ? { initials: "⚡", color: "#64748B", name: "Automation" }
-                  : getAgentAvatar(
+                  : isWebsite
+                    ? { initials: "🛒", color: "#7C3AED", name: "Website" }
+                    : getAgentAvatar(
                       msg.senderId,
                       user,
                       conversation?.assignedAgent ?? null,
@@ -1955,7 +1959,12 @@ export default function ConversationPage() {
                         Automation
                       </span>
                     )}
-                    {!isBot && agent.name}
+                    {isWebsite && (
+                      <span title="Sent automatically by the online store" className="text-[10px] font-semibold uppercase tracking-wide rounded px-1 border text-violet-700 bg-violet-50 border-violet-200">
+                        Website
+                      </span>
+                    )}
+                    {!isBot && !isWebsite && agent.name}
                   </p>
                 );
                 const avatar = groupEnd ? (
