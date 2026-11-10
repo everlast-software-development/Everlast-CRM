@@ -986,11 +986,10 @@ export interface StoreMessageRow {
 }
 export interface WebsiteTemplate extends Template {
   websiteEvent: StoreKind;
-  websiteConfig: { active: boolean; sourceText: string | null };
+  websiteConfig: { active: boolean };
   storeLanguage: StoreLanguage;
   kind: "MARKETING" | "UTILITY";
   storeVars: string[];
-  matchesStoreText?: boolean | null;
 }
 export interface StoreOverviewCell {
   kind: StoreKind;
@@ -1007,7 +1006,6 @@ export interface StoreOverviewCell {
 export interface WebsiteTemplateInput {
   websiteEvent: StoreKind;
   language: StoreLanguage;
-  sourceText: string;
   storeCategory: "marketing" | "utility";
   name: string;
   body: string;

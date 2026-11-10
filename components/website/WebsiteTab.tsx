@@ -94,7 +94,7 @@ export function WebsiteTab() {
 
       <SectionCard
         title="Messages the store sends"
-        description={<>Each needs a WhatsApp template, in English and in Arabic, made from the text staff wrote on the store&apos;s page. {readyCount} of {cells.length} can be sent now.</>}
+        description={<>Each needs a WhatsApp template, in English and in Arabic, filled with the values the store sends. {readyCount} of {cells.length} can be sent now.</>}
       >
         <div className="flex justify-end -mt-2 mb-3">
           <button type="button" onClick={() => act("refresh-cells", loadCells, "Up to date")} className={secondaryBtnCls}><RefreshCw className="w-3.5 h-3.5" /> Check again</button>
@@ -132,7 +132,7 @@ export function WebsiteTab() {
                             ) : null}
                           </p>
                           <button type="button" onClick={() => setEditing({ cell, template: null })} className={secondaryBtnCls}>
-                            <Plus className="w-3.5 h-3.5" /> {cell.storeText ? "Make template from the store's text" : "New template"}
+                            <Plus className="w-3.5 h-3.5" /> New template
                           </button>
                         </div>
                         {cell.storeText ? (
@@ -236,7 +236,7 @@ function TemplateRow({ t, busy, onToggle, onSubmit, onEdit, onTest, onDelete }: 
         <div className="min-w-0 flex flex-wrap items-center gap-1.5">
           <span className="text-[13px] font-semibold text-gray-900 truncate" dir="auto">{t.name}</span>
           <span className={`inline-flex items-center gap-1 text-[11.5px] font-semibold rounded-full px-2 py-0.5 ${st.tone}`}><Icon className="w-3.5 h-3.5" /> {st.label}</span>
-          {t.matchesStoreText === false && <span className="text-[11.5px] font-semibold rounded-full px-2 py-0.5 bg-orange-50 text-orange-700">Old text: the store changed it</span>}
+
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <Toggle checked={t.websiteConfig.active} onChange={onToggle} disabled={busy === `on-${t.id}`} label={`${t.name} on`} />

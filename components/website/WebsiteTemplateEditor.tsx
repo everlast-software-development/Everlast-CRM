@@ -10,9 +10,9 @@ import { WaTemplateMessage } from "@/components/whatsapp/WaPreview";
 import { BUTTON_LIMITS, HEADER_TYPE_OPTIONS, headerCharError } from "@/components/templates/shared";
 import { errorMessage, inputCls, labelCls, primaryBtnCls, secondaryBtnCls } from "@/components/settings/shared";
 
-// The WhatsApp template for one kind × language of store message, made from the
-// text the store's staff wrote: their {first_name} becomes {{first_name}}. A
-// store message is sent with it only while the store's text stays the same
+// The WhatsApp template for one kind × language of store message. A new one can
+// start from the store's own wording ({first_name} becomes {{first_name}}). A
+// store message is sent with the approved template for its kind and language
 // (utils/storeEvents.js → matchTemplate); the server checks everything again.
 
 const BODY_MAX = 800;
@@ -56,9 +56,8 @@ export function WebsiteTemplateEditor({
   onCancel: () => void;
   onSaved: (t: WebsiteTemplate, message: string) => void;
 }) {
-  const startText = template?.websiteConfig.sourceText ?? storeText ?? "";
-  const start = template ? { body: template.body, addedSignOff: false } : bodyFromStoreText(startText, language);
-  const [sourceText, setSourceText] = useState(startText);
+  // A new one starts from the text the store last sent (if any), as a draft to word as you like.
+  const start = template ? { body: template.body, addedSignOff: false } : bodyFromStoreText(storeText ?? "", language);
   const [signOffNote, setSignOffNote] = useState(start.addedSignOff);
   const [name, setName] = useState(template?.name ?? `${def.label} (${LANG_NAME[language]})`);
   const [body, setBody] = useState(start.body);
@@ -86,7 +85,7 @@ export function WebsiteTemplateEditor({
   const edgeBlank = /^\{\{[^{}]+\}\}/.test(body.trim()) || /\{\{[^{}]+\}\}[.!?]?$/.test(body.trim());
   const headerProblem = headerType === "TEXT" ? (!header.trim() ? "Write the header, or choose None." : headerCharError(header)) : isMedia(headerType) && !headerMediaUrl ? `Add ${HEADER_MEDIA[headerType].what}, or choose None.` : null;
   const buttonProblem = buttons.find((b) => !b.title.trim()) ? "Every button needs a label." : buttons.find((b) => b.type === "URL" && !/^https?:\/\/\S+/.test(b.url ?? "")) ? "Every link needs an address." : null;
-  const blocked = !sourceText.trim() || !name.trim() || !body.trim() || unknown.length > 0 || words.length > 0 || edgeBlank || !!headerProblem || !!buttonProblem || uploading;
+  const blocked = !name.trim() || !body.trim() || unknown.length > 0 || words.length > 0 || edgeBlank || !!headerProblem || !!buttonProblem || uploading;
 
   function insert(key: string) {
     const el = bodyRef.current;
@@ -100,7 +99,7 @@ export function WebsiteTemplateEditor({
     setBody(`${before}${pre}${token}${post}${after}`.slice(0, BODY_MAX));
   }
   function applyStoreText() {
-    const b = bodyFromStoreText(sourceText, language);
+    const b = bodyFromStoreText(storeText ?? "", language);
     setBody(b.body);
     setSignOffNote(b.addedSignOff);
   }
@@ -133,7 +132,6 @@ export function WebsiteTemplateEditor({
     const data: WebsiteTemplateInput = {
       websiteEvent: kind,
       language,
-      sourceText: sourceText.trim(),
       storeCategory: category,
       name: name.trim(),
       body: body.trim(),
@@ -160,18 +158,6 @@ export function WebsiteTemplateEditor({
       <form onSubmit={(e) => { e.preventDefault(); save(true); }} className="px-6 pb-6 overflow-y-auto min-h-0">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6">
           <div className="space-y-5 min-w-0">
-            <div>
-              <label htmlFor="wt-source" className={labelCls}>The store&apos;s text</label>
-              <textarea id="wt-source" value={sourceText} onChange={(e) => setSourceText(e.target.value)} rows={3} dir="auto" readOnly={!!template && template.approvalStatus !== "DRAFT" && template.approvalStatus !== "REJECTED"}
-                placeholder="Hi {first_name}, {treatment} is still waiting in your Everlast Wellness cart…" className={`${inputCls} resize-y font-mono text-[12.5px]`} />
-              <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
-                <p className="text-[11.5px] text-gray-400">
-                  {storeText ? "What staff wrote on the store's page, as the store last sent it." : "The store hasn't sent this one yet: paste what staff wrote on the store's page."} Messages are sent only while the store&apos;s text is exactly this.
-                </p>
-                <button type="button" onClick={applyStoreText} className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-fg hover:underline cursor-pointer"><RotateCcw className="w-3 h-3" /> Make the message from it</button>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 items-end">
               <div>
                 <label htmlFor="wt-name" className={labelCls}>Name</label>
@@ -204,7 +190,14 @@ export function WebsiteTemplateEditor({
             </div>
 
             <div>
-              <label htmlFor="wt-body" className={labelCls}>Message</label>
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="wt-body" className={labelCls}>Message</label>
+                {storeText && (
+                  <button type="button" onClick={applyStoreText} title={storeText} className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-fg hover:underline cursor-pointer mb-1.5">
+                    <RotateCcw className="w-3 h-3" /> Start from the store&apos;s wording
+                  </button>
+                )}
+              </div>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {def.vars.map((k) => (
                   <button key={k} type="button" onClick={() => insert(k)} className="inline-flex items-center gap-1 text-[12px] font-medium text-sky-700 bg-sky-50 border border-sky-100 hover:bg-sky-100 rounded-full px-2.5 py-1 cursor-pointer">
