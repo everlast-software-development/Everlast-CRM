@@ -366,7 +366,11 @@ function TestSendDialog({ t, phones, onClose }: { t: WebsiteTemplate; phones: st
           setError(null);
           try {
             const r = await apiTestSendWebsiteTemplate(t.id, phone);
-            toast.success(r.data.usedStoreValues ? "Sent, with the store's latest values" : "Sent, with example values");
+            toast.success(
+              r.data.swappedLink
+                ? "Sent. The store's link wasn't a store address (a test copy?), so an example link was used."
+                : r.data.usedStoreValues ? "Sent, with the store's latest values" : "Sent, with example values",
+            );
             onClose();
           } catch (err) {
             setError(errorMessage(err, "Couldn't send it."));

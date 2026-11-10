@@ -1038,7 +1038,7 @@ export function apiDeleteWebsiteTemplate(id: number) {
   return apiFetch<{ success: boolean }>(`/api/store/templates/${id}`, { method: "DELETE" }, { numberScoped: false });
 }
 export function apiTestSendWebsiteTemplate(id: number, phone: string) {
-  return apiFetch<{ success: boolean; data: { messageId: number; conversationId: number; usedStoreValues: boolean } }>(
+  return apiFetch<{ success: boolean; data: { messageId: number; conversationId: number; usedStoreValues: boolean; swappedLink?: boolean } }>(
     `/api/store/templates/${id}/test-send`, { method: "POST", body: JSON.stringify({ phone }) }, { numberScoped: false },
   );
 }
