@@ -989,6 +989,54 @@ export function apiSaveCampaignSafety(value: import("@/types").CampaignSafetySet
   );
 }
 
+// ── Online store (Templates → Website; admins) ──
+type StoreSettingsResponse = {
+  success: boolean;
+  data: import("@/types").StoreConnection;
+  kinds: Record<import("@/types").StoreKind, import("@/types").StoreKindDef>;
+  variables: Record<string, import("@/types").StoreVarDef>;
+  // The last requests turned away (wrong secret, bad body…), newest first.
+  refused: { at: string; status: number; error: string; messageId: string | null }[];
+};
+export function apiGetStoreSettings() {
+  return apiFetch<StoreSettingsResponse>("/api/store/settings", {}, { numberScoped: false });
+}
+export function apiSaveStoreSettings(value: { enabled?: boolean; numberId?: number | null; linkBase?: string; apiBase?: string | null; apiKey?: string | null }) {
+  return apiFetch<{ success: boolean; data: import("@/types").StoreConnection }>("/api/store/settings", { method: "PUT", body: JSON.stringify(value) }, { numberScoped: false });
+}
+export function apiRotateStoreSecret() {
+  return apiFetch<{ success: boolean; data: import("@/types").StoreConnection }>("/api/store/settings/rotate", { method: "POST" }, { numberScoped: false });
+}
+export function apiGetStoreOverview() {
+  return apiFetch<{ success: boolean; data: import("@/types").StoreOverviewCell[] }>("/api/store/overview", {}, { numberScoped: false });
+}
+export function apiGetStoreMessages(params: { test?: "1" | "0"; kind?: string; status?: string; page?: number } = {}) {
+  const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]));
+  return apiFetch<{ success: boolean; data: import("@/types").StoreMessageRow[]; pagination: { total: number; page: number; limit: number; totalPages: number } }>(
+    `/api/store/messages${q.toString() ? `?${q}` : ""}`, {}, { numberScoped: false },
+  );
+}
+export function apiCreateWebsiteTemplate(data: import("@/types").WebsiteTemplateInput) {
+  return apiFetch<{ success: boolean; data: import("@/types").WebsiteTemplate }>("/api/store/templates", { method: "POST", body: JSON.stringify(data) }, { numberScoped: false });
+}
+export function apiUpdateWebsiteTemplate(id: number, data: Partial<import("@/types").WebsiteTemplateInput>) {
+  return apiFetch<{ success: boolean; data: import("@/types").WebsiteTemplate }>(`/api/store/templates/${id}`, { method: "PUT", body: JSON.stringify(data) }, { numberScoped: false });
+}
+export function apiSetWebsiteTemplateActive(id: number, active: boolean) {
+  return apiFetch<{ success: boolean; data: import("@/types").WebsiteTemplate }>(`/api/store/templates/${id}/active`, { method: "PUT", body: JSON.stringify({ active }) }, { numberScoped: false });
+}
+export function apiSubmitWebsiteTemplate(id: number) {
+  return apiFetch<{ success: boolean; data: import("@/types").WebsiteTemplate }>(`/api/store/templates/${id}/submit`, { method: "POST" }, { numberScoped: false });
+}
+export function apiDeleteWebsiteTemplate(id: number) {
+  return apiFetch<{ success: boolean }>(`/api/store/templates/${id}`, { method: "DELETE" }, { numberScoped: false });
+}
+export function apiTestSendWebsiteTemplate(id: number, phone: string) {
+  return apiFetch<{ success: boolean; data: { messageId: number; conversationId: number; usedStoreValues: boolean } }>(
+    `/api/store/templates/${id}/test-send`, { method: "POST", body: JSON.stringify({ phone }) }, { numberScoped: false },
+  );
+}
+
 export function apiSaveAutoAssign(value: import("@/types").AutoAssignSetting) {
   return apiFetch<{ success: boolean; data: import("@/types").AutoAssignSetting }>(
     "/api/settings/autoAssign",

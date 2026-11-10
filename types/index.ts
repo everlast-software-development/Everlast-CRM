@@ -932,6 +932,92 @@ export interface TestPhonesSetting {
   phones: string[];
 }
 
+// ── Online store (Templates → Website; the API's utils/storeEvents.js) ──
+// The kinds of message the store sends first, as the store names them.
+export type StoreKind =
+  | "abandoned_cart" | "points_expiring" | "rebooking" | "review_request" | "offer_announcement" | "gift_received" | "subscription_failed";
+export type StoreLanguage = "en" | "ar";
+export interface StoreKindDef {
+  label: string;
+  category: "marketing" | "utility";
+  vars: string[];
+  hint: string;
+}
+export interface StoreVarDef {
+  label: string;
+  sample: string;
+  link?: boolean;
+}
+export interface StoreConnection {
+  enabled: boolean;
+  secret: string | null;
+  numberId: number | null;
+  linkBase: string;
+  apiBase: string | null;
+  apiKeyHint: string | null;
+  endpoint: string;
+  line: { id: number; label: string; displayPhoneNumber: string | null } | null;
+}
+export type StoreMessageStatus = "CAPTURED" | "SENDING" | "SENT" | "FAILED" | "UNCONFIRMED";
+export interface StoreMessageRow {
+  id: number;
+  storeId: number | null;
+  kind: StoreKind;
+  category: string;
+  language: StoreLanguage;
+  test: boolean;
+  phone: string;
+  text: string;
+  templateText: string | null;
+  variables: Record<string, string>;
+  payload: unknown;
+  status: StoreMessageStatus;
+  reason: string | null;
+  attempts: number;
+  template: { id: number; name: string } | null;
+  conversationId: number | null;
+  whatsappMessageId: string | null;
+  delivery: "delivered" | "failed" | null;
+  deliveryError: string | null;
+  costAed: string | null;
+  reportedAt: string | null;
+  reportError: string | null;
+  receivedAt: string;
+}
+export interface WebsiteTemplate extends Template {
+  websiteEvent: StoreKind;
+  websiteConfig: { active: boolean; sourceText: string | null };
+  storeLanguage: StoreLanguage;
+  kind: "MARKETING" | "UTILITY";
+  storeVars: string[];
+  matchesStoreText?: boolean | null;
+}
+export interface StoreOverviewCell {
+  kind: StoreKind;
+  language: StoreLanguage;
+  storeText: string | null;
+  storeCategory: "marketing" | "utility" | null;
+  lastValues: Record<string, string> | null;
+  lastSeenAt: string | null;
+  templates: WebsiteTemplate[];
+  ready: boolean;
+  why: string | null;
+  last30Days: Partial<Record<StoreMessageStatus, number>>;
+}
+export interface WebsiteTemplateInput {
+  websiteEvent: StoreKind;
+  language: StoreLanguage;
+  sourceText: string;
+  storeCategory: "marketing" | "utility";
+  name: string;
+  body: string;
+  headerType: TemplateHeaderType;
+  header: string | null;
+  headerMediaUrl: string | null;
+  footer: string | null;
+  buttons: TemplateButton[] | null;
+}
+
 // Giving each new chat to one online agent automatically (the API's utils/autoAssign.js).
 export interface AutoAssignSetting {
   enabled: boolean;

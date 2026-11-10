@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getSocket } from "@/lib/socket";
 import { decidedSince, getTemplatesSeenAt, markTemplatesSeen } from "@/lib/templateUpdates";
@@ -32,6 +32,7 @@ import type {
 } from "@/types";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { PageSpinner } from "@/components/ui/spinner";
+import { WebsiteTab } from "@/components/website/WebsiteTab";
 
 // ---------------------------------------------------------------------------
 // Config / Badges
@@ -437,6 +438,16 @@ export default function TemplatesPage() {
   // name: see CurrentUserProvider. `ready` is false until /users/me answers.
   const { ready, can } = useCurrentUser();
   const allowed = can("template:write");
+  // Templates → Website: the online store's messages. Admins only.
+  const canWebsite = can("settings:write");
+  const [tab, setTab] = useState<"whatsapp" | "website">("whatsapp");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "website") startTransition(() => setTab("website"));
+  }, []);
+  const pickTab = (t: "whatsapp" | "website") => {
+    setTab(t);
+    router.replace(t === "website" ? "/templates?tab=website" : "/templates", { scroll: false });
+  };
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -559,6 +570,32 @@ export default function TemplatesPage() {
         />
       )}
 
+      {canWebsite && (
+        <div className="flex gap-6 border-b border-gray-200 mb-6" role="tablist" aria-label="Template kind">
+          {([["whatsapp", "WhatsApp templates"], ["website", "Website"]] as const).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={tab === k}
+              onClick={() => pickTab(k)}
+              className={`pb-2.5 -mb-px border-b-2 text-[14px] cursor-pointer ${tab === k ? "border-brand text-brand-fg font-semibold" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "website" && canWebsite ? (
+        <>
+          <div className="mb-6">
+            <h1 className="font-bold text-2xl text-gray-900">Website messages</h1>
+            <p className="text-sm text-gray-400 mt-0.5">WhatsApp messages the online store sends: abandoned carts, orders, shipping and follow-ups</p>
+          </div>
+          <WebsiteTab />
+        </>
+      ) : (<>
       {news.length > 0 && !hideNews && (
         <div className="flex items-start justify-between gap-3 bg-brand-100 border border-brand/20 rounded-xl px-4 py-3 mb-5">
           <div className="text-[13px] text-gray-700 space-y-0.5">
@@ -691,6 +728,7 @@ export default function TemplatesPage() {
           ))}
         </div>
       )}
+      </>)}
     </div>
   );
 }
