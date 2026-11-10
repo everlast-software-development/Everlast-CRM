@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from "react";
 import type { ReactNode } from "react";
-import { LogOut, Clock, Hourglass, CalendarClock } from "lucide-react";
+import { LogOut, Clock, Hourglass, CalendarClock, MessageSquarePlus } from "lucide-react";
+import { NewChatDialog } from "@/components/NewChatDialog";
 import { useConversations } from "@/hooks/useConversations";
 import { disconnectSocket, getSocket } from "@/lib/socket";
 import { apiGetConversationCounts, apiLogout } from "@/lib/api";
@@ -183,6 +184,9 @@ export default function ChatsLayout({ children }: { children: ReactNode }) {
   }, []);
   const { ready: userReady, can, me } = useCurrentUser();
   const canUseInbox = can("conversation:write");
+  // The "+" beside Inbox: add a contact and open their chat (like WhatsApp Web's new chat).
+  const canAddContact = can("contact:write");
+  const [newChatOpen, setNewChatOpen] = useState(false);
   // /chats is the app's default landing (the site root, and proxy.ts after
   // login both point here), so a role without an inbox is sent on to the first
   // screen it can use rather than stranded on "access denied".
@@ -343,7 +347,19 @@ export default function ChatsLayout({ children }: { children: ReactNode }) {
                 {unreadChats} unread {unreadChats === 1 ? "chat" : "chats"}
               </span>
             )}
+            {canAddContact && (
+              <button
+                type="button"
+                onClick={() => setNewChatOpen(true)}
+                title="New chat"
+                aria-label="New chat"
+                className="ml-auto w-9 h-9 rounded-full bg-brand hover:bg-[#2f5840] text-white flex items-center justify-center shadow-sm cursor-pointer shrink-0 transition-colors"
+              >
+                <MessageSquarePlus className="w-4.5 h-4.5" />
+              </button>
+            )}
           </div>
+          {newChatOpen && <NewChatDialog onClose={() => setNewChatOpen(false)} />}
 
           {/* Search */}
           <div className="px-4 pb-3">
