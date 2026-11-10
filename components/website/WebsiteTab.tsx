@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ChevronDown, Clock, FileText, Pencil, Plus, RefreshCw, Send, ShoppingCart, Smartphone, Trash2, XCircle } from "lucide-react";
 import {
-  apiDeleteWebsiteTemplate, apiGetSettings, apiGetStoreMessages, apiGetStoreOverview, apiGetStoreSettings,
+  apiCreateStarterWebsiteTemplates, apiDeleteWebsiteTemplate, apiGetSettings, apiGetStoreMessages, apiGetStoreOverview, apiGetStoreSettings,
   apiSetWebsiteTemplateActive, apiSubmitWebsiteTemplate, apiTestSendWebsiteTemplate,
 } from "@/lib/api";
 import type {
@@ -96,7 +96,31 @@ export function WebsiteTab() {
         title="Messages the store sends"
         description={<>Each needs a WhatsApp template, in English and in Arabic, filled with the values the store sends. {readyCount} of {cells.length} can be sent now.</>}
       >
-        <div className="flex justify-end -mt-2 mb-3">
+        <div className="flex flex-wrap justify-end gap-2 -mt-2 mb-3">
+          {cells.some((c) => c.templates.length === 0) && (
+            <button
+              type="button"
+              disabled={busy === "starter"}
+              title="A draft for every message and language that has none yet, from the store's texts, with the link as a button. Read each one, then send it for approval."
+              onClick={async () => {
+                setBusy("starter");
+                try {
+                  const r = await apiCreateStarterWebsiteTemplates();
+                  await loadCells();
+                  const { created, failed } = r.data;
+                  if (failed.length) toast.error(`${created.length} drafts made; ${failed.length} couldn't be: ${failed[0].template} — ${failed[0].error}`);
+                  else toast.success(created.length ? `${created.length} drafts made. Read each one, then send it for approval.` : "Every message already has a template");
+                } catch (err) {
+                  toast.error(errorMessage(err, "Couldn't make the drafts."));
+                } finally {
+                  setBusy(null);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-[#2f5840] disabled:opacity-60 rounded-xl px-4 py-2 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> {busy === "starter" ? "Making drafts…" : "Create the drafts"}
+            </button>
+          )}
           <button type="button" onClick={() => act("refresh-cells", loadCells, "Up to date")} className={secondaryBtnCls}><RefreshCw className="w-3.5 h-3.5" /> Check again</button>
         </div>
         <div className="space-y-4">

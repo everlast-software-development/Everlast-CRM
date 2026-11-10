@@ -85,7 +85,7 @@ export function WebsiteTemplateEditor({
   const edgeBlank = /^\{\{[^{}]+\}\}/.test(body.trim()) || /\{\{[^{}]+\}\}[.!?]?$/.test(body.trim());
   const headerProblem = headerType === "TEXT" ? (!header.trim() ? "Write the header, or choose None." : headerCharError(header)) : isMedia(headerType) && !headerMediaUrl ? `Add ${HEADER_MEDIA[headerType].what}, or choose None.` : null;
   const buttonProblem = buttons.find((b) => !b.title.trim()) ? "Every button needs a label." : buttons.find((b) => b.type === "URL" && !/^https?:\/\/\S+/.test(b.url ?? "")) ? "Every link needs an address." : null;
-  const blocked = !name.trim() || !body.trim() || unknown.length > 0 || words.length > 0 || edgeBlank || !!headerProblem || !!buttonProblem || uploading;
+  const blocked = !name.trim() || !body.trim() || unknown.length > 0 || edgeBlank || !!headerProblem || !!buttonProblem || uploading;
 
   function insert(key: string) {
     const el = bodyRef.current;
@@ -267,9 +267,9 @@ export function WebsiteTemplateEditor({
             </div>
 
             {words.length > 0 && (
-              <p role="alert" className="flex items-start gap-1.5 text-[12.5px] text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              <p role="alert" className="flex items-start gap-1.5 text-[12.5px] text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                 <ShieldAlert className="w-4 h-4 shrink-0 mt-px" />
-                <span>This reads like an offer ({words.map((w) => `"${w}"`).join(", ")}), but the store sends it as a service message. WhatsApp would re-file it as marketing. Ask staff to change the store&apos;s text.</span>
+                <span>Heads-up: this has offer-like words ({words.map((w) => `"${w}"`).join(", ")}), and the store sends it as a service message. WhatsApp may file it as marketing when it approves it; the CRM then treats it that way.</span>
               </p>
             )}
           </div>

@@ -1019,6 +1019,12 @@ export function apiGetStoreMessages(params: { test?: "1" | "0"; kind?: string; s
 export function apiCreateWebsiteTemplate(data: import("@/types").WebsiteTemplateInput) {
   return apiFetch<{ success: boolean; data: import("@/types").WebsiteTemplate }>("/api/store/templates", { method: "POST", body: JSON.stringify(data) }, { numberScoped: false });
 }
+// A draft for every store message × language that has no template yet.
+export function apiCreateStarterWebsiteTemplates() {
+  return apiFetch<{ success: boolean; data: { created: string[]; skipped: string[]; failed: { template: string; error: string }[] } }>(
+    "/api/store/templates/starter", { method: "POST" }, { numberScoped: false },
+  );
+}
 export function apiUpdateWebsiteTemplate(id: number, data: Partial<import("@/types").WebsiteTemplateInput>) {
   return apiFetch<{ success: boolean; data: import("@/types").WebsiteTemplate }>(`/api/store/templates/${id}`, { method: "PUT", body: JSON.stringify(data) }, { numberScoped: false });
 }
