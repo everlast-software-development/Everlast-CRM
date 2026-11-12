@@ -1036,14 +1036,13 @@ function NewCustomerDrawer({ open, onClose, onCreated }: NewDrawerProps) {
 
 // ─── Send Template Drawer ─────────────────────────────────────────────────────
 
-const CATEGORY_COLORS: Record<string, string> = {
-  GENERAL:  "bg-blue-50 text-blue-600",
-  CAMPAIGN: "bg-purple-50 text-purple-600",
-};
-const CATEGORY_LABELS: Record<string, string> = {
-  GENERAL:  "General",
-  CAMPAIGN: "Campaign",
-};
+// The first message to a contact must be a template WhatsApp approved. Patient
+// care (UTILITY: confirmations, reminders, results) is what agents and
+// supervisors send; marketing (offers) only those allowed to
+// (template:send_marketing — supervisors and admins), in its own section, and
+// never to a patient who opted out (the server refuses it). GENERAL templates
+// go out as ordinary messages, which can't start a conversation, so they
+// aren't offered here.
 
 interface SendTemplateDrawerProps {
   customer: Customer | null;
@@ -1060,16 +1059,18 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
+  // What the sender typed for the template's blanks ({ date, time… }).
+  const [fields, setFields] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) { setSelected(null); setError(null); return; }
+    if (!open) { setSelected(null); setFields({}); setError(null); return; }
     setLoadingTemplates(true);
     apiGetTemplates({ status: "APPROVED" })
       .then((res) => {
         // Not-yet-set-up imported templates can't be sent (needsSetup).
-        setTemplates(res.data.filter((t) => (t.category === "GENERAL" || t.category === "CAMPAIGN") && !t.needsSetup?.length && (canMarketing || !isMarketingTemplate(t))));
+        setTemplates(res.data.filter((t) => t.category !== "GENERAL" && !!t.metaTemplateName && !t.needsSetup?.length && (canMarketing || !isMarketingTemplate(t))));
       })
       .catch(() => setTemplates([]))
       .finally(() => setLoadingTemplates(false));
@@ -1084,7 +1085,10 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
     try {
       const convRes = await apiCreateConversation(Number(id));
       const conv = convRes.data;
-      await apiSendTemplate(String(conv.id), selected);
+      await apiSendTemplate(String(conv.id), selected, {
+        clientMessageId: `ct-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+        ...(Object.keys(fields).length ? { fields } : {}),
+      });
       onSent(conv);
       onClose();
       router.push(`/chats/${conv.id}`);
@@ -1096,6 +1100,29 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
   }
 
   const selectedTemplate = templates.find((t) => t.id === selected);
+  const care = templates.filter((t) => !isMarketingTemplate(t));
+  const marketing = templates.filter((t) => isMarketingTemplate(t));
+  const blanks = selectedTemplate?.fillIns ?? [];
+  const blanksMissing = blanks.some((b) => !String(fields[b.key] ?? "").trim());
+  const pick = (id: number) => { setSelected(id); setFields({}); setError(null); };
+  const card = (t: Template) => (
+    <button
+      key={t.id}
+      type="button"
+      onClick={() => pick(t.id)}
+      className={`w-full text-left rounded-xl border px-4 py-3.5 transition-colors cursor-pointer ${
+        selected === t.id ? "border-brand bg-brand-100 ring-1 ring-brand/20" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <p className="text-[13px] font-semibold text-gray-900 truncate" dir="auto">{t.name}</p>
+        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${isMarketingTemplate(t) ? "bg-purple-50 text-purple-600" : "bg-sky-50 text-sky-700"}`}>
+          {isMarketingTemplate(t) ? "Marketing" : "Patient care"}
+        </span>
+      </div>
+      <p className="text-[12px] text-gray-500 line-clamp-2 leading-relaxed" dir="auto">{t.body}</p>
+    </button>
+  );
 
   return (
     <>
@@ -1123,7 +1150,7 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
             </button>
           </div>
           <p className="text-[12px] text-gray-400 mt-2">
-            Pick an approved template to start the conversation.
+            WhatsApp lets you write first only with an approved template. Pick one to start the conversation.
           </p>
         </div>
 
@@ -1138,30 +1165,24 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
               <div className="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center mb-1">
                 <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 13h4"/></svg>
               </div>
-              <p className="text-[14px] font-semibold text-gray-700">No approved templates</p>
-              <p className="text-[13px] text-gray-400">Create and submit a GENERAL or CAMPAIGN template first.</p>
+              <p className="text-[14px] font-semibold text-gray-700">No approved templates yet</p>
+              <p className="text-[13px] text-gray-400">Patient-care templates (confirmations, reminders) are made on Patient messages and need WhatsApp&apos;s approval.</p>
             </div>
           ) : (
-            templates.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setSelected(t.id)}
-                className={`w-full text-left rounded-xl border px-4 py-3.5 transition-colors cursor-pointer ${
-                  selected === t.id
-                    ? "border-brand bg-brand-100 ring-1 ring-brand/20"
-                    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <p className="text-[13px] font-semibold text-gray-900 truncate">{t.name}</p>
-                  <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${CATEGORY_COLORS[t.category] ?? "bg-gray-100 text-gray-500"}`}>
-                    {CATEGORY_LABELS[t.category] ?? t.category}
-                  </span>
-                </div>
-                <p className="text-[12px] text-gray-500 line-clamp-2 leading-relaxed">{t.body}</p>
-              </button>
-            ))
+            <>
+              {care.length > 0 && <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Patient care</p>}
+              {care.map(card)}
+              {care.length === 0 && (
+                <p className="text-[12.5px] text-gray-400">No approved patient-care templates yet (Patient messages).</p>
+              )}
+              {marketing.length > 0 && (
+                <>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider pt-3">Marketing</p>
+                  <p className="text-[11.5px] text-gray-400 -mt-1">Offers. Never sent to a patient who opted out.</p>
+                  {marketing.map(card)}
+                </>
+              )}
+            </>
           )}
         </div>
 
@@ -1185,6 +1206,23 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
                 </div>
               )}
             </div>
+            {blanks.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fill in</p>
+                {blanks.map((b) => (
+                  <div key={b.key}>
+                    <label htmlFor={`ct-fill-${b.key}`} className="text-[12px] font-medium text-gray-600">{b.label}</label>
+                    <input
+                      id={`ct-fill-${b.key}`}
+                      value={fields[b.key] ?? ""}
+                      onChange={(e) => setFields((f) => ({ ...f, [b.key]: e.target.value }))}
+                      dir="auto"
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1202,7 +1240,7 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
             <button
               type="button"
               onClick={handleSend}
-              disabled={selected == null || sending}
+              disabled={selected == null || sending || blanksMissing}
               className="flex-1 py-2.5 rounded-xl bg-brand hover:bg-[#2f5840] disabled:opacity-50 disabled:cursor-not-allowed text-[13px] font-semibold text-white transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
               {sending ? (
