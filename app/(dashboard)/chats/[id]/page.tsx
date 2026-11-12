@@ -1850,7 +1850,7 @@ export default function ConversationPage() {
       ) : (
         <div className="relative flex-1 z-10 min-h-0">
           {/* Why the AI passed this customer to the team, pinned over the top. */}
-          <AiHandoffBanner conversationId={id} handedOffAt={conversation?.aiHandedOffAt} />
+          <AiHandoffBanner conversationId={id} handedOffAt={conversation?.aiHandedOffAt} assignee={conversation?.assignedAgent} />
           <div
             ref={messagesContainerRef}
             onScroll={handleMessagesScroll}

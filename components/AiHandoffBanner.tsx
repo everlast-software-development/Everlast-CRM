@@ -19,7 +19,12 @@ const fmtWhen = (iso: string) => {
     : d.toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 };
 
-export function AiHandoffBanner({ conversationId, handedOffAt }: { conversationId: string; handedOffAt: string | null | undefined }) {
+export function AiHandoffBanner({ conversationId, handedOffAt, assignee }: {
+  conversationId: string;
+  handedOffAt: string | null | undefined;
+  /** The chat's owner now: who it went to (null = still waiting in Unassigned). */
+  assignee: { name?: string | null; username: string } | null | undefined;
+}) {
   const [handoff, setHandoff] = useState<{ at: string; kind: "handover" | "error"; summary: string | null } | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
@@ -66,6 +71,11 @@ export function AiHandoffBanner({ conversationId, handedOffAt }: { conversationI
           ) : (
             <p className="text-[12.5px] text-gray-600 mt-0.5">{isError ? "Read their last message and reply." : "No summary was given: read their last messages."}</p>
           )}
+          <p className={`text-[12px] mt-1 font-medium ${assignee ? "text-gray-600" : "text-amber-700"}`}>
+            {assignee
+              ? `Given to ${assignee.name || assignee.username}.`
+              : "Waiting in Unassigned: no agent was online. Take it with the owner button at the top."}
+          </p>
         </div>
         <button type="button" onClick={dismiss} title="Dismiss" aria-label="Dismiss" className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:bg-white hover:text-gray-600 shrink-0 cursor-pointer">
           <X className="w-4 h-4" />

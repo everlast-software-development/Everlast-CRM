@@ -148,7 +148,7 @@ export default function HandoffNotifier() {
       chime();
       if (canNotify()) {
         const n = new Notification(handoffTitle(h), {
-          body: h.interest ? `Interested in: ${h.interest}` : `From the "${h.flowName}" flow`,
+          body: h.flowName === "AI assistant" ? h.interest || "The AI handed this customer to the team" : h.interest ? `Interested in: ${h.interest}` : `From the "${h.flowName}" flow`,
           tag: `handoff-${h.conversationId}`,
         });
         n.onclick = () => { window.focus(); openHandoff(h); n.close(); };
@@ -217,7 +217,11 @@ export default function HandoffNotifier() {
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-bold text-gray-900 leading-snug">{handoffTitle(h)}</p>
-                  {h.interest && <p className="text-[12px] text-gray-600 mt-0.5">Interested in: <span className="font-semibold">{h.interest}</span></p>}
+                  {h.interest && (h.flowName === "AI assistant" ? (
+                    <p className="text-[12px] text-gray-800 mt-1 bg-gray-50 rounded-lg px-2 py-1" dir="auto">{h.interest}</p>
+                  ) : (
+                    <p className="text-[12px] text-gray-600 mt-0.5">Interested in: <span className="font-semibold">{h.interest}</span></p>
+                  ))}
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     {h.agentUsername ? `Assigned to you · ` : "Waiting in Unassigned · "}
                     {h.flowName} · {fmtTime(h.at)}
