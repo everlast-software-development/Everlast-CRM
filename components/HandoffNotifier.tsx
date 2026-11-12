@@ -49,6 +49,8 @@ interface AssignedToYou {
   customerName: string | null;
   customerPhone: string;
   reason: string;
+  // Why it came to them, e.g. the AI's hand-over summary.
+  note?: string | null;
   at: string;
 }
 
@@ -254,8 +256,11 @@ export default function HandoffNotifier() {
                     New chat for you · <span className="break-words">{who(c)}</span>
                   </p>
                   <p className="text-[12px] text-gray-600 mt-0.5">
-                    {c.reason === "waiting in Unassigned" ? "Was waiting in Unassigned. It's yours now." : "A patient is waiting for your reply. It's yours now."}
+                    {c.reason === "AI hand-over"
+                      ? "The AI handed this patient to the team. It's yours now."
+                      : c.reason === "waiting in Unassigned" ? "Was waiting in Unassigned. It's yours now." : "A patient is waiting for your reply. It's yours now."}
                   </p>
+                  {c.note && <p className="text-[12px] text-gray-800 mt-1 bg-gray-50 rounded-lg px-2 py-1" dir="auto">{c.note}</p>}
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     {fmtTime(c.at)}
                     {multiLine && <span className={otherLine ? "font-semibold text-amber-700" : undefined}> · {lineLabel(c.whatsappNumberId)}</span>}

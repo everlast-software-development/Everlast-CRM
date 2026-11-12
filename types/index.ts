@@ -38,6 +38,8 @@ export interface Conversation {
   customer?: Customer;
   assignedAgentId: number | null;
   assignedAgent: { id: number; name?: string | null; username: string } | null;
+  // The store's AI is answering this chat (since then); null = it isn't.
+  aiActiveAt?: string | null;
   status: "OPEN" | "PENDING" | "RESOLVED";
   unreadCount: number;
   lastMessage: string | null;
@@ -1023,11 +1025,19 @@ export interface AutoAssignSetting {
   enabled: boolean;
 }
 
+// The store's AI answering chats nobody owns (the API's utils/aiAssistant.js).
+export interface AiAssistantSetting {
+  enabled: boolean;
+  mode: "test" | "all";
+  numberIds: number[];
+}
+
 export interface WorkspaceSettings {
   quietHours: QuietHoursSetting;
   campaignSafety: CampaignSafetySetting;
   testPhones: TestPhonesSetting;
   autoAssign: AutoAssignSetting;
+  aiAssistant?: AiAssistantSetting;
 }
 
 export interface AdminWhatsAppNumber {

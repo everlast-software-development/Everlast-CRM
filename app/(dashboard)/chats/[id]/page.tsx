@@ -1799,6 +1799,14 @@ export default function ConversationPage() {
               optOut={optOut}
               owner={conversation.assignedAgent ?? null}
             />
+            {conversation.aiActiveAt && !conversation.assignedAgent && (
+              <span
+                title="The store's AI is answering this chat. Assign it to yourself or reply, and the AI stops."
+                className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-full px-2 py-0.5 whitespace-nowrap"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" /> AI is answering
+              </span>
+            )}
             <AssigneePicker conversationId={id} assignee={conversation.assignedAgent ?? null} />
           </>
         )}
@@ -1936,7 +1944,11 @@ export default function ConversationPage() {
                 // never as whoever happens to be looking at the chat.
                 // Same for the online store's automatic messages: "Website".
                 const isWebsite = msg.origin === "WEBSITE";
-                const agent = msg.senderType === "BOT"
+                // The store's AI answering (utils/aiAssistant.js): "AI".
+                const isAi = msg.origin === "AI";
+                const agent = isAi
+                  ? { initials: "AI", color: "#0F766E", name: "AI assistant" }
+                  : msg.senderType === "BOT"
                   ? { initials: "⚡", color: "#64748B", name: "Automation" }
                   : isWebsite
                     ? { initials: "🛒", color: "#7C3AED", name: "Website" }
@@ -1954,7 +1966,12 @@ export default function ConversationPage() {
                 const bubbleTone = isBot ? "bg-[#DDEBFA] border-[#B9D3F0]" : "bg-[#D9FDD3] border-[#BFE6B6]";
                 const nameLabel = (
                   <p className="text-[11px] font-medium text-gray-500 text-right mb-1 flex items-center justify-end gap-1">
-                    {isBot && (
+                    {isAi && (
+                      <span title="Answered by the store's AI" className="text-[10px] font-semibold uppercase tracking-wide rounded px-1 border text-teal-700 bg-teal-50 border-teal-200">
+                        AI
+                      </span>
+                    )}
+                    {isBot && !isAi && (
                       <span className="text-[10px] font-semibold uppercase tracking-wide rounded px-1 border text-[#64748B] bg-[#EEF2F6] border-[#DCE3EB]">
                         Automation
                       </span>

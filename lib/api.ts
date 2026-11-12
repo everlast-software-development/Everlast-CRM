@@ -1043,6 +1043,14 @@ export function apiTestSendWebsiteTemplate(id: number, phone: string) {
   );
 }
 
+export function apiSaveAiAssistant(value: Partial<import("@/types").AiAssistantSetting>) {
+  return apiFetch<{ success: boolean; data: import("@/types").AiAssistantSetting }>(
+    "/api/settings/aiAssistant",
+    { method: "PUT", body: JSON.stringify(value) },
+    { numberScoped: false },
+  );
+}
+
 export function apiSaveAutoAssign(value: import("@/types").AutoAssignSetting) {
   return apiFetch<{ success: boolean; data: import("@/types").AutoAssignSetting }>(
     "/api/settings/autoAssign",

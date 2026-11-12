@@ -577,6 +577,8 @@ export default function ChatsLayout({ children }: { children: ReactNode }) {
                           >
                             {getInitials(c.assignedAgent.name || c.assignedAgent.username)}
                           </span>
+                        ) : c.aiActiveAt && c.status !== "RESOLVED" ? (
+                          <span title="The store's AI is answering" className="text-[10.5px] font-semibold text-teal-700">AI answering</span>
                         ) : c.status !== "RESOLVED" ? (
                           <span className="text-[10.5px] font-medium text-amber-600">Unassigned</span>
                         ) : null}

@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MessageSquareText, MoonStar, ShieldCheck, Shuffle, Smartphone, UserRound, Users, type LucideIcon } from "lucide-react";
+import { Bot, MessageSquareText, MoonStar, ShieldCheck, Shuffle, Smartphone, UserRound, Users, type LucideIcon } from "lucide-react";
 import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { PageSpinner } from "@/components/ui/spinner";
 import { SectionedLayout } from "@/components/SectionedLayout";
@@ -13,6 +13,7 @@ import { CampaignSafetyPanel } from "@/components/settings/CampaignSafetyPanel";
 import { MyAccountPanel } from "@/components/settings/MyAccountPanel";
 import { SavedRepliesPanel } from "@/components/settings/SavedRepliesPanel";
 import { AutoAssignPanel } from "@/components/settings/AutoAssignPanel";
+import { AiAssistantPanel } from "@/components/settings/AiAssistantPanel";
 import type { Permission } from "@/lib/permissions";
 
 // The section lives in the URL (?tab=) so a link — or the old /team page — can
@@ -24,6 +25,7 @@ const TABS = [
   { key: "users", label: "Users", group: "Workspace", icon: Users, wide: true, perm: "user:write", description: "Who can sign in, their roles and what they can access" },
   { key: "numbers", label: "WhatsApp numbers", group: "Workspace", icon: Smartphone, wide: true, perm: "number:write", description: "The WhatsApp lines the team sends and receives on" },
   { key: "assigning", label: "Assigning chats", group: "Messaging", icon: Shuffle, wide: false, perm: "settings:write", description: "Who gets a new chat: given out automatically, or first to reply" },
+  { key: "ai-assistant", label: "AI assistant", group: "Messaging", icon: Bot, wide: false, perm: "settings:write", description: "The store’s AI answers chats nobody owns, then hands them to the team" },
   { key: "quiet-hours", label: "Quiet hours", group: "Messaging", icon: MoonStar, wide: false, perm: "settings:write", description: "When campaign messages are held back" },
   { key: "campaign-safety", label: "Campaign safety", group: "Messaging", icon: ShieldCheck, wide: false, perm: "settings:write", description: "Limits that protect patients and the number's quality" },
   { key: "saved-replies", label: "Saved replies", group: "Messaging", icon: MessageSquareText, wide: true, perm: "settings:write", description: "Ready-made answers agents insert by typing /" },
@@ -75,6 +77,7 @@ function SettingsContent() {
       {tab === "users" && <UsersPanel key="users" />}
       {tab === "numbers" && <WhatsAppNumbersPanel key="numbers" />}
       {tab === "assigning" && <AutoAssignPanel key="assigning" />}
+      {tab === "ai-assistant" && <AiAssistantPanel key="ai-assistant" />}
       {tab === "quiet-hours" && <QuietHoursPanel key="quiet-hours" />}
       {tab === "campaign-safety" && <CampaignSafetyPanel key="campaign-safety" />}
       {tab === "saved-replies" && <SavedRepliesPanel key="saved-replies" />}
