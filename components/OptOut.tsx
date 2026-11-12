@@ -169,7 +169,7 @@ function DialogShell({ title, busy, onClose, children }: { title: string; busy: 
   }, [busy, onClose]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center px-4" onClick={() => !busy && onClose()}>
+    <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center px-4">
       <div role="dialog" aria-modal="true" aria-label={title} className="bg-white rounded-2xl shadow-2xl w-[420px] max-w-full p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-[15px] font-bold text-gray-900 mb-1.5">{title}</h3>
         {children}

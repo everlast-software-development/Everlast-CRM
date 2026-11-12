@@ -56,7 +56,7 @@ function LogoutDrawer({ open, onConfirm, onCancel }: { open: boolean; onConfirm:
       }`}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
+      <div className="absolute inset-0 bg-black/40" />
 
       {/* Panel */}
       <div

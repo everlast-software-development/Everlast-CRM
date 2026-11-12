@@ -5,6 +5,7 @@ import { apiGetSettings, apiSaveCampaignSafety, apiSaveTestPhones } from "@/lib/
 import type { CampaignSafetySetting } from "@/types";
 import { useToast } from "@/components/ui/toast";
 import { PageSpinner } from "@/components/ui/spinner";
+import { PhoneInput, type PhoneValue } from "@/components/PhoneInput";
 import {
   LoadError,
   SectionCard,
@@ -60,15 +61,18 @@ function LevelCard({
 function TestPhonesCard({ initial }: { initial: string[] }) {
   const toast = useToast();
   const [phones, setPhones] = useState<string[]>(initial);
-  const [draft, setDraft] = useState("");
+  // The phone field's current number (+E.164 when valid); the key empties it after Add.
+  const [draft, setDraft] = useState<PhoneValue>({ e164: "", valid: false, raw: "" });
+  const [draftKey, setDraftKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function add() {
-    const v = draft.trim();
-    if (!v) return;
+    if (!draft.valid) return;
+    const v = draft.e164.replace("+", "");
     setPhones((list) => (list.includes(v) ? list : [...list, v]));
-    setDraft("");
+    setDraft({ e164: "", valid: false, raw: "" });
+    setDraftKey((k) => k + 1);
   }
 
   async function save() {
@@ -111,15 +115,8 @@ function TestPhonesCard({ initial }: { initial: string[] }) {
         </ul>
       )}
       <div className="flex gap-2">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-          placeholder="+971 50 123 4567"
-          inputMode="tel"
-          className={`${inputCls} flex-1 min-w-0 px-3 py-2`}
-        />
-        <button type="button" onClick={add} disabled={!draft.trim()} className={secondaryBtnCls}>Add</button>
+        <PhoneInput key={draftKey} onChange={setDraft} onEnter={add} className="flex-1 min-w-0" />
+        <button type="button" onClick={add} disabled={!draft.valid} className={`${secondaryBtnCls} self-start`}>Add</button>
       </div>
       {error && <p className="text-[13px] text-red-500 font-medium mt-3">{error}</p>}
       <div className="flex justify-end mt-4">

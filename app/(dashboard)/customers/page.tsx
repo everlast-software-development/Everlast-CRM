@@ -22,27 +22,13 @@ import { useCurrentUser } from "@/components/CurrentUserProvider";
 import { isMarketingTemplate } from "@/components/OptOut";
 import { useActiveNumber } from "@/components/WhatsAppNumberProvider";
 import { SEGMENTS_ENABLED } from "@/lib/features";
+import { PhoneInput, type PhoneValue } from "@/components/PhoneInput";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 30;
 
-// ─── Phone normalization & validation ────────────────────────────────────────
-
-function normalizePhone(raw: string): string {
-  const s = raw.trim();
-  let digits = s.replace(/\D/g, "");
-  if (s.startsWith("+")) return digits;           // +201012345678 → 201012345678
-  if (digits.startsWith("00")) return digits.slice(2); // 00201012345678 → 201012345678
-  // Local Egyptian number: 01XXXXXXXXX (11 digits starting with 0)
-  if (digits.startsWith("0") && digits.length >= 9 && digits.length <= 12)
-    return "20" + digits.slice(1);
-  return digits;
-}
-
-function isValidPhone(normalized: string): boolean {
-  return /^\d{7,15}$/.test(normalized);
-}
+// ─── Validation (phone numbers: components/PhoneInput, checked per country) ──
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -324,7 +310,6 @@ function CustomerDetailDrawer({ customer, conv, onClose, onSaved, onDeleted }: D
     <>
       {/* Backdrop */}
       <div
-        onClick={onClose}
         className={`fixed inset-0 z-[49] bg-black/20 transition-opacity duration-300 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
       />
 
@@ -790,7 +775,8 @@ interface NewDrawerProps {
 }
 
 function NewCustomerDrawer({ open, onClose, onCreated }: NewDrawerProps) {
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState<PhoneValue>({ e164: "", valid: false, raw: "" });
+  const [phoneKey, setPhoneKey] = useState(0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
@@ -809,13 +795,10 @@ function NewCustomerDrawer({ open, onClose, onCreated }: NewDrawerProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const phoneRef = useRef<HTMLInputElement>(null);
 
-  // Live normalized preview
-  const normalizedPreview = phone.trim() ? normalizePhone(phone) : "";
-  const phonePreviewValid = normalizedPreview ? isValidPhone(normalizedPreview) : null;
 
   useEffect(() => {
     if (open) {
-      setPhone(""); setName(""); setEmail(""); setNotes("");
+      setPhone({ e164: "", valid: false, raw: "" }); setPhoneKey((k) => k + 1); setName(""); setEmail(""); setNotes("");
       setTags([]); setTagInput(""); setApiError(null); setErrors({});
       setChartNumber(""); setNationality(""); setGender("");
       setDateOfBirth(""); setJoinDate(""); setDepartments([]); setDeptInput("");
@@ -825,9 +808,8 @@ function NewCustomerDrawer({ open, onClose, onCreated }: NewDrawerProps) {
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
-    const normalized = normalizePhone(phone);
-    if (!phone.trim()) errs.phone = "Phone number is required.";
-    else if (!isValidPhone(normalized)) errs.phone = "Invalid phone number — couldn't parse it to a valid international number.";
+    if (!phone.raw.trim()) errs.phone = "Phone number is required.";
+    else if (!phone.valid) errs.phone = "That isn't a valid number for the country chosen. Check the country code and the number.";
     if (email.trim() && !isValidEmail(email)) errs.email = "Enter a valid email address.";
     if (name.trim().length > 100) errs.name = "Name must be 100 characters or fewer.";
     if (notes.trim().length > 1000) errs.notes = "Notes must be 1000 characters or fewer.";
@@ -841,7 +823,7 @@ function NewCustomerDrawer({ open, onClose, onCreated }: NewDrawerProps) {
     setSubmitting(true); setApiError(null);
     try {
       await apiCreateCustomer({
-        phone: normalizePhone(phone),
+        phone: phone.e164,
         ...(name.trim() ? { name: name.trim() } : {}),
         ...(email.trim() ? { email: email.trim() } : {}),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
@@ -870,7 +852,7 @@ function NewCustomerDrawer({ open, onClose, onCreated }: NewDrawerProps) {
 
   return (
     <div className={`fixed inset-0 z-[100] flex flex-col justify-end transition-opacity duration-300 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}>
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" />
       <div className={`relative bg-white rounded-t-2xl shadow-2xl px-5 pt-4 pb-10 transition-transform duration-300 ease-out max-h-[92dvh] overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-200 [&::-webkit-scrollbar-thumb]:rounded-full ${open ? "translate-y-0" : "translate-y-full"}`}>
         <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mb-5" />
         <div className="flex items-center justify-between mb-6">
@@ -884,25 +866,13 @@ function NewCustomerDrawer({ open, onClose, onCreated }: NewDrawerProps) {
           {/* Mobile */}
           <div className="space-y-1.5">
             <label className="text-[13px] font-medium text-gray-700">Mobile <span className="text-red-500">*</span></label>
-            <input
+            {/* Country code + number, checked for that country; a new key empties it each time the sheet opens. */}
+            <PhoneInput
+              key={phoneKey}
               ref={phoneRef}
-              type="tel"
-              value={phone}
-              onChange={(e) => { setPhone(e.target.value); setErrors((p) => ({ ...p, phone: "" })); }}
-              placeholder="+20 101 234 5678 or 01012345678"
-              className={inputCls("phone")}
+              invalid={!!errors.phone}
+              onChange={(v) => { setPhone(v); setErrors((p) => ({ ...p, phone: "" })); }}
             />
-            {/* Live preview */}
-            {normalizedPreview && (
-              <p className={`text-[12px] flex items-center gap-1 ${phonePreviewValid ? "text-green-600" : "text-amber-600"}`}>
-                {phonePreviewValid ? (
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                ) : (
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
-                )}
-                Will be stored as: <span className="font-mono font-semibold">{normalizedPreview}</span>
-              </p>
-            )}
             {errors.phone && <p className="text-[12px] text-red-500">{errors.phone}</p>}
           </div>
 
@@ -1130,7 +1100,6 @@ function SendTemplateDrawer({ customer, onClose, onSent }: SendTemplateDrawerPro
   return (
     <>
       <div
-        onClick={onClose}
         className={`fixed inset-0 z-[49] bg-black/20 transition-opacity duration-300 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
       />
       <div

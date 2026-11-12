@@ -117,7 +117,7 @@ export function DrawerShell({ open, onClose, title, children }: DrawerShellProps
       }`}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" />
 
       {/* Panel — slides from right on sm+ */}
       <div

@@ -236,7 +236,7 @@ function Dialog({ title, intro, onCancel, saving, children }: {
   }, [onCancel, saving]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center px-4" onClick={() => !saving && onCancel()}>
+    <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center px-4">
       <div role="dialog" aria-modal="true" aria-label={title} className="bg-white rounded-2xl shadow-2xl w-[420px] max-w-full p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-[15px] font-bold text-gray-900 mb-1.5">{title}</h3>
         <p className="text-[13px] text-gray-500 mb-4">{intro}</p>

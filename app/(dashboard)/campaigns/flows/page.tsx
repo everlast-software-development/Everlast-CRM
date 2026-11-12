@@ -317,7 +317,7 @@ export default function FlowsPage() {
       )}
 
       {deleting && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center" onClick={() => setDeleting(null)}>
+        <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[16px] font-bold text-gray-900">Delete “{deleting.name}”?</h3>
             <p className="text-[13px] text-gray-500 mt-2">It hasn&apos;t been used yet, so nothing is lost. Campaigns using it will stop running automation.</p>

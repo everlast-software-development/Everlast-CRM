@@ -4,45 +4,43 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, apiCreateConversation, apiCreateCustomer, apiGetCustomers } from "@/lib/api";
 import { DialogButtons, DialogShell } from "@/components/DialogShell";
+import { PhoneInput, type PhoneValue } from "@/components/PhoneInput";
 import { errorMessage, inputCls, labelCls } from "@/components/settings/shared";
 
-// The inbox's "+" (like WhatsApp Web's new chat): a phone number and a name →
-// the contact (added, or found if they're already saved) and their chat on the
-// line in use, opened. A new contact has never written, so their 24-hour
-// window is closed: the chat offers an approved template to start with.
-
-const digits = (s: string) => s.replace(/\D/g, "");
+// The inbox's "+" (like WhatsApp Web's new chat): a phone number (country code
+// + number, checked for that country) and a name → the contact (added, or found
+// if they're already saved) and their chat on the line in use, opened. A new
+// contact has never written, so their 24-hour window is closed: the chat
+// offers an approved template to start with.
 
 export function NewChatDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const [phone, setPhone] = useState("+971 ");
+  const [phone, setPhone] = useState<PhoneValue>({ e164: "", valid: false, raw: "" });
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ready = digits(phone).length >= 8;
 
-  async function findByPhone(raw: string) {
-    // The server keeps numbers as international digits; match on the ending, which
-    // survives a local 05… number too.
-    const tail = digits(raw).slice(-9);
+  async function findByPhone(e164: string) {
+    // Saved numbers are international digits ("971501234567"): match on the ending.
+    const tail = e164.replace(/\D/g, "").slice(-9);
     const res = await apiGetCustomers(1, 10, tail);
-    return res.data.find((c) => digits(c.phone).endsWith(tail)) ?? null;
+    return res.data.find((c) => c.phone.replace(/\D/g, "") === e164.replace(/\D/g, "")) ?? null;
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!ready || saving) return;
+    if (!phone.valid || saving) return;
     setSaving(true);
     setError(null);
     try {
       let customerId: number;
       try {
-        const created = await apiCreateCustomer({ phone: phone.trim(), ...(name.trim() ? { name: name.trim() } : {}) });
+        const created = await apiCreateCustomer({ phone: phone.e164, ...(name.trim() ? { name: name.trim() } : {}) });
         customerId = Number(created.data.id);
       } catch (err) {
         // Already saved: open their chat instead.
         if (!(err instanceof ApiError) || err.status !== 409) throw err;
-        const existing = await findByPhone(phone);
+        const existing = await findByPhone(phone.e164);
         if (!existing) throw err;
         customerId = Number(existing.id);
       }
@@ -60,8 +58,8 @@ export function NewChatDialog({ onClose }: { onClose: () => void }) {
       <form onSubmit={submit} className="px-6 pb-6 space-y-4">
         <div>
           <label htmlFor="nc-phone" className={labelCls}>Phone number</label>
-          <input id="nc-phone" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" dir="ltr" autoFocus placeholder="+971 50 123 4567" className={inputCls} />
-          <p className="text-[11.5px] text-gray-400 mt-1">With the country code. If they&apos;re already a contact, their chat opens.</p>
+          <PhoneInput id="nc-phone" autoFocus onChange={setPhone} />
+          <p className="text-[11.5px] text-gray-400 mt-1">Pick the country, then the number. If they&apos;re already a contact, their chat opens.</p>
         </div>
         <div>
           <label htmlFor="nc-name" className={labelCls}>Name <span className="font-normal text-gray-400">(optional)</span></label>
@@ -71,7 +69,7 @@ export function NewChatDialog({ onClose }: { onClose: () => void }) {
           WhatsApp lets you write first only with an approved template. Once they reply, you can chat freely for 24 hours.
         </p>
         {error && <p role="alert" className="text-[13px] text-red-500 font-medium">{error}</p>}
-        <DialogButtons saving={saving} onCancel={onClose} label="Start chat" disabled={!ready} />
+        <DialogButtons saving={saving} onCancel={onClose} label="Start chat" disabled={!phone.valid} />
       </form>
     </DialogShell>
   );

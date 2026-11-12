@@ -24,7 +24,7 @@ export function DialogShell({ title, intro, onCancel, saving, width = "w-[420px]
   }, [onCancel, saving]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center px-4 py-6" onClick={() => !saving && onCancel()}>
+    <div className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center px-4 py-6">
       <div
         role="dialog"
         aria-modal="true"

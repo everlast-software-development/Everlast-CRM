@@ -29,11 +29,11 @@ function formatWhen(iso: string): string {
     d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-function Modal({ onClose, busy, children }: { onClose: () => void; busy: boolean; children: ReactNode }) {
+// Closes only through its own buttons, never by a click outside it.
+function Modal({ children }: { onClose: () => void; busy: boolean; children: ReactNode }) {
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4"
-      onClick={() => !busy && onClose()}
     >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
         {children}
