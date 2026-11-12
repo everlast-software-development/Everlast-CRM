@@ -40,6 +40,8 @@ export interface Conversation {
   assignedAgent: { id: number; name?: string | null; username: string } | null;
   // The store's AI is answering this chat (since then); null = it isn't.
   aiActiveAt?: string | null;
+  // When the store's AI last handed this chat to the team.
+  aiHandedOffAt?: string | null;
   status: "OPEN" | "PENDING" | "RESOLVED";
   unreadCount: number;
   lastMessage: string | null;
@@ -1030,6 +1032,10 @@ export interface AiAssistantSetting {
   enabled: boolean;
   mode: "test" | "all";
   numberIds: number[];
+  // The rules (Settings → AI assistant).
+  quietHours?: number;
+  gatherSeconds?: number;
+  maxGatherSeconds?: number;
 }
 
 export interface WorkspaceSettings {

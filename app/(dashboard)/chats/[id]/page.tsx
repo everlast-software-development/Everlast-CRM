@@ -78,6 +78,7 @@ import {
 } from "media-chrome/react/media-store";
 import { isWindowClosed } from "@/lib/messagingWindow";
 import { AssigneePicker } from "@/components/AssigneePicker";
+import { AiHandoffBanner } from "@/components/AiHandoffBanner";
 import { ChatViewers } from "@/components/ChatViewers";
 import { ConversationOutcomeControl } from "@/components/ConversationOutcomeControl";
 import { OptOutBanner, isMarketingTemplate, isOptedOut, useOptOutState, type OptOutState } from "@/components/OptOut";
@@ -1848,6 +1849,8 @@ export default function ConversationPage() {
         </div>
       ) : (
         <div className="relative flex-1 z-10 min-h-0">
+          {/* Why the AI passed this customer to the team, pinned over the top. */}
+          <AiHandoffBanner conversationId={id} handedOffAt={conversation?.aiHandedOffAt} />
           <div
             ref={messagesContainerRef}
             onScroll={handleMessagesScroll}

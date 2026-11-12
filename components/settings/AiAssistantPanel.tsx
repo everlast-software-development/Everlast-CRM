@@ -10,6 +10,35 @@ import { PageSpinner } from "@/components/ui/spinner";
 import { useActiveNumber } from "@/components/WhatsAppNumberProvider";
 import { LoadError, SectionCard, Toggle, errorMessage } from "@/components/settings/shared";
 
+// One editable rule: a number with its unit, saved when it changes and leaves the field.
+function RuleInput({ label, unit, value, min, max, hint, onSave }: {
+  label: string; unit: string; value: number; min: number; max: number; hint: string; onSave: (v: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const n = Number(draft);
+  const valid = draft.trim() !== "" && Number.isFinite(n) && n >= min && n <= max;
+  const commit = () => { if (valid && n !== value) onSave(n); else if (!valid) setDraft(String(value)); };
+  return (
+    <div>
+      <label className="text-[12px] font-medium text-gray-600">{label}</label>
+      <div className="flex items-center gap-2 mt-1">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } }}
+          className={`w-20 rounded-lg border px-2.5 py-1.5 text-[13px] outline-none ${valid ? "border-gray-200 focus:border-brand" : "border-red-300"}`}
+        />
+        <span className="text-[12px] text-gray-500">{unit}</span>
+      </div>
+      <p className="text-[11px] text-gray-400 mt-1">{hint} ({min}–{max})</p>
+    </div>
+  );
+}
+
 // The store's AI answering chats nobody owns (the API's utils/aiAssistant.js).
 // The store runs the AI; the CRM decides when it may answer and hands over to
 // the team. Saved the moment something changes.
@@ -119,10 +148,43 @@ export function AiAssistantPanel() {
             </div>
           )}
 
+          <div>
+            <p className="text-[13px] font-semibold text-gray-700 mb-2">Rules</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <RuleInput
+                label="Quiet after a hand-over"
+                unit="hours"
+                value={ai.quietHours ?? 24}
+                min={0}
+                max={168}
+                hint="0 = it may answer again as soon as nobody owns the chat."
+                onSave={(v) => save({ quietHours: v }, "Quiet time saved")}
+              />
+              <RuleInput
+                label="Wait after each message"
+                unit="seconds"
+                value={ai.gatherSeconds ?? 3}
+                min={1}
+                max={10}
+                hint="Messages sent within this are answered together."
+                onSave={(v) => save({ gatherSeconds: v }, "Wait saved")}
+              />
+              <RuleInput
+                label="Longest wait"
+                unit="seconds"
+                value={ai.maxGatherSeconds ?? 10}
+                min={ai.gatherSeconds ?? 1}
+                max={30}
+                hint="For someone who keeps writing."
+                onSave={(v) => save({ maxGatherSeconds: v }, "Longest wait saved")}
+              />
+            </div>
+          </div>
+
           <ul className="text-[12px] text-gray-600 space-y-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 list-disc pl-8">
             <li>It answers only chats <b>nobody owns</b>, after any flow. Automatic assignment waits while it&apos;s answering.</li>
             <li>The moment someone <b>takes the chat or replies</b>, it stops. An answer still on its way is thrown away.</li>
-            <li>When the customer wants a person, or the store can&apos;t answer, the chat goes to an online agent with the reason. The AI then stays quiet in that chat for 24 hours.</li>
+            <li>When the customer wants a person, or the store can&apos;t answer, the chat goes to an online agent with the reason. The AI then stays out of that chat for the quiet time above, and while a person owns it.</li>
             <li>Its messages show as <b>AI</b> in the chat, and the inbox shows &ldquo;AI answering&rdquo;. Staff can also read these chats in the store&apos;s Admin → Assistant chats.</li>
             <li>STOP / إيقاف: the AI stops, and the store&apos;s own WhatsApp messages stop too.</li>
           </ul>

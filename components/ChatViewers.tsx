@@ -27,18 +27,24 @@ export function ChatViewers({ conversationId, typing = [] }: { conversationId: s
   useEffect(() => {
     const socket = getSocket();
     const id = Number(conversationId);
-    const view = () => socket.emit("conversation.view", { conversationId: id });
+    // Only while this tab is actually on screen: a chat left open in a background
+    // tab, a minimised window or a locked computer isn't someone viewing it.
+    const view = () => { if (document.visibilityState === "visible") socket.emit("conversation.view", { conversationId: id }); };
+    const leave = () => socket.emit("conversation.leave", { conversationId: id });
+    const onVisibility = () => (document.visibilityState === "visible" ? view() : leave());
     const onViewers = (p: { conversationId?: number | string; viewers?: ChatViewer[] }) => {
       if (String(p?.conversationId) === conversationId) setViewers({ chat: conversationId, list: p.viewers ?? [] });
     };
     socket.on("conversation.viewers", onViewers);
     // After a reconnect the server has forgotten us: say again what we're showing.
     socket.on("connect", view);
+    document.addEventListener("visibilitychange", onVisibility);
     view();
     return () => {
       socket.off("conversation.viewers", onViewers);
       socket.off("connect", view);
-      socket.emit("conversation.leave", { conversationId: id });
+      document.removeEventListener("visibilitychange", onVisibility);
+      leave();
     };
   }, [conversationId]);
 

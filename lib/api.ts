@@ -228,6 +228,13 @@ export function apiGetAssignableUsers() {
   return apiFetch<{ success: boolean; data: import("@/types").AssignableUser[] }>("/api/users/assignable");
 }
 
+// The store's AI's latest hand-over in a chat (banner at the top of the chat).
+export function apiGetAiHandoff(conversationId: string) {
+  return apiFetch<{ success: boolean; data: { at: string; kind: "handover" | "error"; summary: string | null } | null }>(
+    `/api/conversations/${conversationId}/ai-handoff`,
+  );
+}
+
 export function apiGetMessages(conversationId: string, page = 1, limit = 200) {
   return apiFetch<MessagesResponse>(
     `/api/conversations/${conversationId}/messages?page=${page}&limit=${limit}`
