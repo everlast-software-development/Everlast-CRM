@@ -1682,3 +1682,47 @@ export interface ChatSeenBy {
   visits: number;
   user: { id: number; name: string | null; username: string; role: string };
 }
+
+/** One appointment from the clinic system (Dok32), as the Appointments page shows it. */
+export type AppointmentStatusGroup = "unconfirmed" | "no_answer" | "confirmed" | "arrived" | "done" | "cancelled" | "other";
+export interface ClinicAppointment {
+  id: string;
+  startsAt: string;
+  /** 27/11/2026 */
+  date: string;
+  /** 6:30 pm */
+  time: string;
+  endTime: string;
+  minutes: number;
+  name: string;
+  /** +9715… or null */
+  phone: string | null;
+  language: "en" | "ar";
+  /** As written in Dok32, e.g. "DrMira Gad" or "B F2". */
+  provider: string | null;
+  /** As the confirmation message would name them, e.g. "Dr. Mira Gad" / "our specialist". */
+  providerInMessage: string;
+  session: string | null;
+  room: string | null;
+  statusId: number;
+  status: string;
+  statusGroup: AppointmentStatusGroup;
+  /** Would the appointment confirmation message go to this patient. */
+  willBeSent: boolean;
+  whyNot: string | null;
+  customerId: number | null;
+  conversationId: number | null;
+}
+export interface AppointmentsDay {
+  /** YYYY-MM-DD, clinic time */
+  date: string;
+  timezone: string;
+  fetchedAt: string;
+  appointments: ClinicAppointment[];
+  summary: {
+    appointments: number;
+    patients: number;
+    messages: number;
+    byGroup: Partial<Record<AppointmentStatusGroup, number>>;
+  };
+}

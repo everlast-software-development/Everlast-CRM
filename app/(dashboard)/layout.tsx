@@ -26,6 +26,7 @@ import {
   Pin,
   Wallet,
   MessagesSquare,
+  CalendarDays,
 } from "lucide-react";
 import { getSocket, disconnectSocket } from "@/lib/socket";
 import { apiLogout, apiGetLineCounts, apiGetPendingApprovals, apiGetErrorSummary } from "@/lib/api";
@@ -294,6 +295,8 @@ function DashboardShell({ children }: { children: ReactNode }) {
     { href: "/chats",            icon: MessageSquare,   label: "Inbox",        enabled: true,  badge: unreadCount > 0 ? unreadCount : undefined, perm: "conversation:write" as const },
     // Every agent's chats and who is waiting (supervisors, admins).
     { href: "/supervision",      icon: Eye,             label: "Supervision",  enabled: true,  perm: "team:supervise" as const },
+    // The clinic's appointments from Dok32, read-only (supervisors, admins).
+    { href: "/appointments",     icon: CalendarDays,    label: "Appointments", enabled: true,  perm: "appointment:read" as const },
   ].filter((i) => can(i.perm));
   const navAfterContacts = [
     { href: "/campaigns",        icon: Megaphone,       label: "Campaigns",    enabled: true, perm: "campaign:read" as const, badge: canApprove && pendingApprovals > 0 ? pendingApprovals : undefined },

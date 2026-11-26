@@ -1220,6 +1220,15 @@ export function apiGetCampaignsReport(params: ReportQuery) {
 }
 
 /** The Marketing dashboard: campaign funnel, flows, audience, line health, what needs attention. */
+/** The clinic's appointments on one day from Dok32 ("2026-11-27"; omitted = today). */
+export function apiGetAppointments(date?: string) {
+  return apiFetch<{ success: boolean; data: import("@/types").AppointmentsDay }>(
+    `/api/appointments${date ? `?date=${encodeURIComponent(date)}` : ""}`,
+    {},
+    { numberScoped: false },
+  );
+}
+
 /** WhatsApp spend per line for a month ("2026-11"; omitted = this month). */
 export function apiGetSpending(month?: string) {
   return apiFetch<{ success: boolean; data: import("@/types").SpendingReport }>(

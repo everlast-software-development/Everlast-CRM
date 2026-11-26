@@ -31,6 +31,7 @@ export type Permission =
   | "number:read" | "number:use_any" | "number:write"
   | "settings:write"
   | "team:supervise"
+  | "appointment:read"
   | "optout:lift"
   | "dev:tools";
 
